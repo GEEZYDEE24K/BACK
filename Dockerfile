@@ -1,25 +1,20 @@
-# Dockerfile for Trueque Estudiantil backend
-# Use official Python image (slim) without virtualenv
 FROM python:3.12-slim
 
-# Install OS dependencies (postgres client libraries)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential \
-        libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Evita que Python escriba pyc y use buffers
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-# Set working directory
 WORKDIR /app
 
-# Copy requirements and install globally
+# Copiar sólo los archivos de dependencias para aprovechar cache
 COPY backend_estudiantil/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source code
-COPY backend_estudiantil ./backend_estudiantil
+# Copiar el resto del código
+COPY . .
 
-# Expose the default port
+# Exponer el puerto en que corre FastAPI
 EXPOSE 8000
 
-# Command to run the FastAPI app
+# Comando de ejecución
 CMD ["uvicorn", "backend_estudiantil.infrastructure.main:app", "--host", "0.0.0.0", "--port", "8000"]

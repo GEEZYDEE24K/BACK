@@ -44,8 +44,10 @@ pytest backend_estudiantil/tests
 
 ### Docker
 ```bash
+# Construir la imagen
 docker build -t trueque-backend .
-docker run -p 8000:8000 --env-file backend_estudiantil/.env trueque-backend
+# Levantar con Docker Compose (incluye PostgreSQL 15)
+docker compose up --build
 ```
 
 ---
