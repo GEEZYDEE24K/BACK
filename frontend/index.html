@@ -117,8 +117,11 @@
                         <button class="btn btn-primary" onclick="app.openModal('publish-book-modal')">
                             <i class="fa-solid fa-plus"></i> Publicar un Libro
                         </button>
+                        <button class="btn btn-secondary" onclick="app.openVerificationDemo()">
+                            <i class="fa-solid fa-brain"></i> Probar Red Neuronal con Foto
+                        </button>
                         <button class="btn btn-secondary" onclick="app.navigateTo('matches')">
-                            <i class="fa-solid fa-wand-magic-sparkles"></i> Ver Matches Inteligentes
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Ver Matches
                         </button>
                     </div>
                 </div>
@@ -613,6 +616,19 @@
                 <button class="btn-icon" onclick="app.closeModal('publish-book-modal')"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="modal-body">
+                <!-- Banner de IA -->
+                <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(234, 88, 12, 0.12)); border: 1px solid rgba(234, 88, 12, 0.35); border-radius: var(--radius-md); padding: 0.85rem 1rem; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.85rem;">
+                    <div style="width: 42px; height: 42px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: white;">
+                        <i class="fa-solid fa-microchip" style="font-size: 1.25rem;"></i>
+                    </div>
+                    <div>
+                        <strong style="font-size: 0.92rem; color: var(--text-primary); display: block;">Verificación Antifraude con Red Neuronal (MobileNetV3 + OCR)</strong>
+                        <span style="font-size: 0.8rem; color: var(--text-secondary);">
+                            El libro requiere verificación fotográfica. Puedes adjuntar las fotos aquí mismo o al presionar continuar se generará tu código de seguridad único.
+                        </span>
+                    </div>
+                </div>
+
                 <form onsubmit="event.preventDefault(); app.submitNewBook();">
                     <div class="form-group">
                         <label class="form-label">Título del libro o material:</label>
@@ -662,8 +678,27 @@
                         <label class="form-label">Descripción adicional o notas:</label>
                         <textarea id="new-book-descripcion" class="form-control" rows="3" placeholder="Indica si tiene subrayados, forro o anotaciones útiles..."></textarea>
                     </div>
-                    <button type="submit" class="btn btn-primary" style="width: 100%;">
-                        <i class="fa-solid fa-cloud-arrow-up"></i> Publicar en el Catálogo
+
+                    <!-- Sección de Subida de Fotos para la Red Neuronal -->
+                    <div style="background: var(--bg-surface-elevated); border: 1px dashed var(--border-color); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1.25rem;">
+                        <h4 style="font-size: 0.9rem; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-primary);">
+                            <i class="fa-solid fa-camera" style="color: var(--primary);"></i> Montar fotos para análisis con IA (Opcional aquí o en el siguiente paso):
+                        </h4>
+                        <div class="form-group" style="margin-bottom: 0.75rem;">
+                            <label class="form-label" style="font-size: 0.82rem;"><i class="fa-solid fa-image"></i> Foto de Portada del libro:</label>
+                            <input type="file" id="new-book-cover-direct" class="form-control" accept="image/jpeg,image/png,image/webp">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label" style="font-size: 0.82rem;"><i class="fa-solid fa-barcode"></i> Foto de Página Legal / ISBN:</label>
+                            <input type="file" id="new-book-isbn-direct" class="form-control" accept="image/jpeg,image/png,image/webp">
+                        </div>
+                        <span style="display: block; font-size: 0.76rem; color: var(--text-muted); margin-top: 0.5rem;">
+                            <i class="fa-solid fa-circle-info"></i> Puedes montarlas aquí directamente o hacerlo con el código de seguridad en el siguiente paso.
+                        </span>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="btn-submit-publish-book" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.6rem;">
+                        <i class="fa-solid fa-brain"></i> Publicar y Verificar con Red Neuronal
                     </button>
                 </form>
             </div>

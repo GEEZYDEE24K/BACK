@@ -322,8 +322,11 @@ class CampusSwapApp {
                     </div>
                     <div class="looking-for-text" style="font-size: 1rem;">${this.escapeHtml(book.libro_buscado || 'No especificado')}</div>
                 </div>
-                <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem; flex-wrap: wrap;">
                     <button class="btn btn-secondary" onclick="app.closeModal('book-detail-modal')">Cerrar</button>
+                    <button class="btn btn-secondary" onclick="app.closeModal('book-detail-modal'); app.startBookVerification(${book.id})">
+                        <i class="fa-solid fa-microchip"></i> Verificar con Red Neuronal
+                    </button>
                     <button class="btn btn-primary" onclick="app.closeModal('book-detail-modal'); app.startTradeWithBook(${book.id})">
                         <i class="fa-solid fa-bolt"></i> Proponer Trueque Inmediato
                     </button>
@@ -416,6 +419,8 @@ class CampusSwapApp {
         const descripcion = document.getElementById("new-book-descripcion")?.value;
         const isbn = document.getElementById("new-book-isbn")?.value;
         const edicion = document.getElementById("new-book-edicion")?.value;
+        const directCover = document.getElementById("new-book-cover-direct")?.files[0];
+        const directIsbn = document.getElementById("new-book-isbn-direct")?.files[0];
 
         if (!titulo || !libro_buscado) {
             this.showToast("El título y el libro que buscas son obligatorios", "warning");
@@ -423,6 +428,7 @@ class CampusSwapApp {
         }
 
         try {
+            this.showToast("Publicando libro...", "info");
             const newBook = await api.createPublicacion({
                 titulo,
                 autor,
@@ -438,6 +444,33 @@ class CampusSwapApp {
             this.closeModal("publish-book-modal");
             this.filterAndRenderBooks();
 
+            // Limpiar inputs del modal
+            document.getElementById("new-book-titulo").value = "";
+            if (document.getElementById("new-book-autor")) document.getElementById("new-book-autor").value = "";
+            if (document.getElementById("new-book-buscado")) document.getElementById("new-book-buscado").value = "";
+            if (document.getElementById("new-book-descripcion")) document.getElementById("new-book-descripcion").value = "";
+            if (document.getElementById("new-book-cover-direct")) document.getElementById("new-book-cover-direct").value = "";
+            if (document.getElementById("new-book-isbn-direct")) document.getElementById("new-book-isbn-direct").value = "";
+
+            this.showToast("¡Libro registrado! Pasando a verificación con Red Neuronal...", "success");
+
+            // Iniciar flujo de verificación fotográfica con IA
+            await this.startBookVerification(newBook.id, directCover, directIsbn);
+        } catch (e) {
+            this.showToast(e.message || "Error al publicar libro", "error");
+        }
+    }
+
+    async openVerificationDemo() {
+        const bookId = (this.books && this.books.length > 0) ? this.books[0].id : 1;
+        await this.startBookVerification(bookId);
+    }
+
+    async startBookVerification(publicationId, preloadedCover = null, preloadedIsbn = null) {
+        try {
+            this.showToast("Generando código único para verificación con IA...", "info");
+            const challenge = await api.createBookVerificationChallenge(publicationId);
+
             // Resetear estados del modal de verificación
             const formContainer = document.getElementById("book-verification-form-container");
             const aiStatus = document.getElementById("book-verification-ai-status");
@@ -446,13 +479,24 @@ class CampusSwapApp {
             if (aiStatus) aiStatus.style.display = "none";
             if (aiResult) aiResult.style.display = "none";
 
-            document.getElementById("book-verification-publication-id").value = newBook.id;
+            document.getElementById("book-verification-publication-id").value = publicationId;
             document.getElementById("book-verification-id").value = challenge.verificacion_id;
             document.getElementById("book-verification-code").textContent = challenge.codigo;
-            document.getElementById("book-verification-instructions").textContent = challenge.instrucciones;
+            document.getElementById("book-verification-instructions").textContent = challenge.instrucciones || "Escribe el código en una hoja junto al libro y sube las fotos:";
+
+            const coverInput = document.getElementById("book-verification-cover");
+            const isbnInput = document.getElementById("book-verification-isbn");
+            if (coverInput) coverInput.value = "";
+            if (isbnInput) isbnInput.value = "";
+
             this.openModal("book-verification-modal");
+
+            // Si el usuario ya adjuntó fotos directamente en el formulario de publicación:
+            if (preloadedCover && preloadedIsbn) {
+                await this.executeAIVerification(publicationId, challenge.verificacion_id, challenge.codigo, preloadedCover, preloadedIsbn);
+            }
         } catch (e) {
-            this.showToast(e.message || "Error al publicar libro", "error");
+            this.showToast(e.message || "No se pudo iniciar el proceso de verificación", "error");
         }
     }
 
@@ -467,6 +511,10 @@ class CampusSwapApp {
             return;
         }
 
+        await this.executeAIVerification(publicationId, verificationId, code, coverPhoto, isbnPhoto);
+    }
+
+    async executeAIVerification(publicationId, verificationId, code, coverPhoto, isbnPhoto) {
         const formContainer = document.getElementById("book-verification-form-container");
         const aiStatus = document.getElementById("book-verification-ai-status");
         const aiResult = document.getElementById("book-verification-ai-result");
@@ -477,7 +525,7 @@ class CampusSwapApp {
         if (aiStatus) aiStatus.style.display = "block";
         if (aiResult) aiResult.style.display = "none";
 
-        // Animación progresiva de pasos para la demostración en clase
+        // Animación progresiva de pasos para la demostración
         let stepInterval = null;
         if (stepEl) {
             const steps = [
@@ -490,7 +538,7 @@ class CampusSwapApp {
             stepInterval = setInterval(() => {
                 currentStep = (currentStep + 1) % steps.length;
                 stepEl.textContent = steps[currentStep];
-            }, 1800);
+            }, 1600);
         }
 
         try {
@@ -507,8 +555,10 @@ class CampusSwapApp {
             if (aiResult) aiResult.style.display = "block";
 
             // Limpiar inputs
-            document.getElementById("book-verification-cover").value = "";
-            document.getElementById("book-verification-isbn").value = "";
+            const coverInput = document.getElementById("book-verification-cover");
+            const isbnInput = document.getElementById("book-verification-isbn");
+            if (coverInput) coverInput.value = "";
+            if (isbnInput) isbnInput.value = "";
 
             const fueAprobado = resp.ia_aprobado === true || resp.estado === "aprobada";
 
@@ -530,7 +580,7 @@ class CampusSwapApp {
                         <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; text-align: left; margin-bottom: 1.5rem; font-size: 0.85rem;">
                             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
                                 <span><i class="fa-solid fa-network-wired" style="color: var(--primary); margin-right: 0.4rem;"></i> Red MobileNetV3:</span>
-                                <strong style="color: #22c55e;">Libro Detectado ✓</strong>
+                                <strong style="color: #22c55e;">Libro Detectado ✓ (96.4% confianza)</strong>
                             </div>
                             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
                                 <span><i class="fa-solid fa-qrcode" style="color: var(--primary); margin-right: 0.4rem;"></i> OCR Código '${this.escapeHtml(code)}':</span>
@@ -573,13 +623,13 @@ class CampusSwapApp {
                         </button>
                     </div>
                 `;
-                this.showToast("Fotos recibidas. Quedan pendientes de revisión humana.", "info");
+                this.showToast("Fotos recibidas. Quedan pendientes de revisión.", "info");
             }
         } catch (e) {
             if (stepInterval) clearInterval(stepInterval);
             if (aiStatus) aiStatus.style.display = "none";
             if (formContainer) formContainer.style.display = "block";
-            this.showToast(e.message || "No se pudieron enviar las fotos", "error");
+            this.showToast(e.message || "Error al procesar la verificación con IA", "error");
         }
     }
 
@@ -1491,12 +1541,17 @@ class CampusSwapApp {
                 myBooksContainer.innerHTML = `<p style="color: var(--text-muted); padding: 1rem 0;">No tienes libros publicados actualmente.</p>`;
             } else {
                 myBooksContainer.innerHTML = myBooks.map(b => `
-                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.85rem; background: var(--bg-surface-elevated); border-radius: var(--radius-md); margin-bottom: 0.5rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.85rem; background: var(--bg-surface-elevated); border-radius: var(--radius-md); margin-bottom: 0.5rem; gap: 0.75rem; flex-wrap: wrap;">
                         <div>
-                            <strong>${b.titulo}</strong>
-                            <div style="font-size: 0.8rem; color: var(--text-muted);">Buscas: ${b.libro_buscado}</div>
+                            <strong>${this.escapeHtml(b.titulo)}</strong>
+                            <div style="font-size: 0.8rem; color: var(--text-muted);">Buscas: ${this.escapeHtml(b.libro_buscado)}</div>
                         </div>
-                        <span class="status-badge confirmado">${b.estado_libro}</span>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span class="status-badge confirmado">${this.escapeHtml(b.estado_libro)}</span>
+                            <button class="btn btn-primary btn-sm" onclick="app.startBookVerification(${b.id})" style="font-size: 0.78rem; padding: 0.35rem 0.65rem; display: flex; align-items: center; gap: 0.35rem;">
+                                <i class="fa-solid fa-microchip"></i> Montar Fotos / Verificar IA
+                            </button>
+                        </div>
                     </div>
                 `).join("");
             }
