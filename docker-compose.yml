@@ -13,6 +13,13 @@ services:
     volumes:
       - pg_data:/var/lib/postgresql/data
 
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
   api:
     build: .
     container_name: trueque_api
@@ -20,9 +27,16 @@ services:
       - .env
     depends_on:
       - db
+      - redis
+    environment:
+      REDIS_URL: redis://redis:6379/0
     ports:
       - "8000:8000"
+    volumes:
+      - book_verification_data:/app/storage/book-verification
     restart: unless-stopped
 
 volumes:
   pg_data:
+  redis_data:
+  book_verification_data:

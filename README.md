@@ -21,7 +21,7 @@ Permite el registro e inicio de sesión de estudiantes universitarios, gestión 
   - `GET /usuarios/me` y `PUT /usuarios/me` para consulta y edición de perfil propio.
   - CRUD administrativo con control de roles (`admin`, `moderador`, `user`).
   - Endpoint para verificación de salud de la base de datos (`GET /health/db`).
-- **Migraciones con Alembic**: Migración en español `1975ea83b712_crear_tabla_usuarios.py`.
+- **Migraciones con Alembic**: Migraciones `1975ea83b712_crear_tabla_usuarios.py` y `3c4d92f18a70_agregar_rol_moderador.py`.
 - **Suite de Pruebas Automatizadas**: 100% en verde con `pytest` y `httpx`.
 
 ---
@@ -52,7 +52,17 @@ DATABASE_URL=postgresql+asyncpg://postgres:123456@localhost:5432/trueque
 
 COOKIE_SECURE=False
 JWT_SECRET_KEY=MySuperSecretKey1234567890!@#$%^&*()_+
+
+# Acceso social opcional: deja vacíos estos valores si no habilitarás el proveedor
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=http://localhost:8000/auth/google/callback
+TWITTER_CLIENT_ID=
+TWITTER_CLIENT_SECRET=
+TWITTER_REDIRECT_URI=http://localhost:8000/auth/twitter/callback
 ```
+
+Para habilitar Google o X, crea una aplicación OAuth en la consola del proveedor, configura el callback exactamente igual a la URL `*_REDIRECT_URI` y copia el ID/secret al archivo `.env` del backend (no al frontend ni al repositorio). En Google, agrega las cuentas que probarán el login como usuarios de prueba mientras la pantalla de consentimiento esté en modo de pruebas. Si faltan credenciales, el backend responderá explícitamente que ese proveedor no está configurado.
 
 ### 2. Instalar dependencias
 ```bash
@@ -102,6 +112,26 @@ uvicorn backend_estudiantil.infrastructure.main:app --host 0.0.0.0 --port 8000 -
 | Método | Ruta | Descripción |
 |---|---|---|
 | `POST` | `/admin/users/{user_id}/promote` | Promover usuario a rol moderador |
+
+### 📚 Publicaciones, trueques y conversaciones
+| Método | Ruta | Descripción |
+|---|---|---|
+| `POST` | `/publicaciones/` | Registrar un libro pendiente de verificación (requiere sesión y categoría válida) |
+| `GET` | `/publicaciones/mis-publicaciones` | Listar los libros del usuario autenticado |
+| `POST` | `/publicaciones/{id}/verificacion/desafios` | Generar el código temporal para fotografiar portada y página ISBN |
+| `POST` | `/publicaciones/{id}/verificacion/evidencias` | Subir evidencia fotográfica privada |
+| `GET` | `/publicaciones/verificaciones/pendientes` | Consultar la cola de revisión (admin/moderador) |
+| `POST` | `/publicaciones/verificaciones/{id}/revision` | Aprobar o rechazar evidencia (admin/moderador) |
+| `POST` | `/trueques/` o `/trueques/proponer` | Proponer un trueque entre dos publicaciones activas; la publicación ofrecida debe pertenecer al usuario |
+| `GET` | `/trueques/mis-trueques` | Listar trueques propios con participantes y libros asociados |
+| `GET` | `/trueques/{id}/mensajes` | Consultar el historial privado de la conversación |
+| `POST` | `/trueques/{id}/mensajes` | Enviar un mensaje (máximo 2.000 caracteres) |
+| `WS` | `/trueques/{id}/ws` | Recibir mensajes en tiempo real como participante autenticado |
+| `POST` | `/trueques/{id}/confirmar`, `/completar`, `/rechazar` | Avanzar o cerrar el ciclo del intercambio |
+
+Las categorías iniciales de libros se crean al iniciar la API. Cada libro nuevo queda oculto hasta que el dueño suba fotos de portada y de la página del ISBN con un código temporal visible y moderación las apruebe. Admins y moderadores gestionan la cola y revisan las fotos desde el panel de administración; los admins pueden promover moderadores. Las fotos se guardan privadas, se eliminan sus metadatos y no se usan datos biométricos. La revisión inicial es humana; el proyecto aún no dispone de un dataset etiquetado para entrenar un clasificador fiable de autenticidad.
+
+La conversación queda disponible durante la propuesta y confirmación; se cierra al rechazar o completar el trueque. El historial se consulta en páginas de hasta 100 mensajes. Redis distribuye los mensajes entre réplicas; `docker compose up --build` levanta Redis y persiste las evidencias fotográficas junto a PostgreSQL. Para varias máquinas, sustituye el almacenamiento local por almacenamiento de objetos privado compartido.
 
 ---
 

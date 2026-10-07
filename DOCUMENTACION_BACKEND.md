@@ -4,7 +4,7 @@
 **Documento Técnico Oficial de Proyecto**  
 **Versión:** 1.0.0 — Backend Funcional y Documentado  
 **Fecha:** Septiembre de 2026  
-**Estado:** 100% Funcional · 8 de 8 Pruebas Aprobadas (100% Verde)
+**Estado:** API de usuarios, publicaciones, trueques y conversaciones P2P implementada
 
 ---
 
@@ -167,6 +167,17 @@ El Refresh Token se almacena en una cookie del navegador con directivas de alta 
 | `PUT` | `/usuarios/{user_id}` | Admin o Propietario | Actualización administrativa de información de un usuario. |
 | `DELETE` | `/usuarios/{user_id}` | Solo Admin (403) | Eliminación de un usuario del sistema (código 204 No Content). |
 | `POST` | `/admin/users/{id}/promote` | Solo Admin (403) | Promueve a un usuario al rol privilegiado de 'moderador'. |
+| `POST` | `/publicaciones/` | Estudiante (Token) | Registra un libro oculto hasta demostrar posesión y recibir aprobación de moderación. |
+| `GET` | `/publicaciones/mis-publicaciones` | Estudiante (Token) | Lista los libros activos e inactivos del usuario autenticado. |
+| `POST` | `/publicaciones/{id}/verificacion/desafios` | Propietario (Token) | Genera un código temporal para las fotos de portada y página ISBN. |
+| `POST` | `/publicaciones/{id}/verificacion/evidencias` | Propietario (Token) | Sube fotos privadas con código visible; límite 8 MB por foto. |
+| `GET` | `/publicaciones/verificaciones/pendientes` | Moderación (Token) | Consulta la cola de evidencias por revisar. |
+| `POST` | `/publicaciones/verificaciones/{id}/revision` | Moderación (Token) | Aprueba o rechaza la evidencia; solo la aprobación activa el libro. |
+| `GET` | `/publicaciones/verificaciones/{id}/evidencia/{tipo}` | Propietario o moderación | Sirve fotos privadas tras comprobar autorización. |
+| `POST` | `/trueques/` | Estudiante (Token) | Propone un trueque entre publicaciones activas y propias/de otro usuario. |
+| `GET` | `/trueques/mis-trueques` | Estudiante (Token) | Lista trueques y conversaciones asociados al usuario. |
+| `GET/POST` | `/trueques/{id}/mensajes` | Participante (Token) | Lee o envía mensajes de la conversación del trueque. |
+| `WS` | `/trueques/{id}/ws` | Participante (JWT bearer) | Recibe mensajes en tiempo real de la conversación. |
 | `GET` | `/health` | Público | Health check básico del servidor FastAPI. |
 | `GET` | `/health/db` | Público | Health check profundo que prueba la conexión activa con PostgreSQL/SQLite. |
 
@@ -174,7 +185,7 @@ El Refresh Token se almacena en una cookie del navegador con directivas de alta 
 
 ## 6. Pruebas Automatizadas y Calidad (QA)
 
-La suite de pruebas automatizadas certifica la funcionalidad total del sistema:
+La prueba de integración P2P verifica el registro de libros, autorización entre participantes, mensajes en tiempo real y cierre del chat. La ejecución histórica de la suite base aparece debajo.
 
 | Archivo de Prueba | Función de Prueba | Resultado | Aspecto Validado |
 |---|---|---|---|
@@ -183,6 +194,7 @@ La suite de pruebas automatizadas certifica la funcionalidad total del sistema:
 | `test_user_service.py` | `test_update_user` | **PASSED** | Actualización de nombre y datos en servicio de dominio. |
 | `test_user_service.py` | `test_delete_user` | **PASSED** | Eliminación y captura de ValueError al consultar borrado. |
 | `test_user_crud.py` | `test_user_crud_and_promotion` | **PASSED** | Flujo E2E: registro, login, `/me`, update `/me`, listar y ascenso a moderador. |
+| `test_p2p_flow.py` | `test_publish_book_and_complete_authenticated_trade_conversation` | **PASSED** | Publicación, trueque asociado a libros, historial P2P, WebSocket autenticado, permisos y cierre. |
 | `test_auth_integration.py` | `test_health_and_database_connection` | **PASSED** | Respuesta de `/health` y conexión real a BD en `/health/db`. |
 | `test_auth_integration.py` | `test_login_and_refresh` | **PASSED** | Emisión de Access Token, cookie HttpOnly, refresh y logout. |
 | `test_auth_integration.py` | `test_google_oauth_flow` | **PASSED** | Intercambio de código OAuth simulado con Respx y emisión de JWT. |
@@ -207,7 +219,20 @@ tests/test_auth_integration.py::test_google_oauth_flow PASSED            [100%]
 
 ---
 
-## 7. Guía de Puesta en Marcha y Despliegue
+## 7. Flujo de publicación, trueque y conversación P2P
+
+1. El estudiante autenticado registra un libro con `POST /publicaciones/`. La publicación queda inactiva y oculta mientras se verifica.
+2. Solicita `POST /publicaciones/{id}/verificacion/desafios` y toma dos fotos recientes mostrando el código temporal en la portada y en la página del ISBN. El desafío vence en 15 minutos.
+3. Envía ambas fotos con `POST /publicaciones/{id}/verificacion/evidencias`. Un administrador o moderador abre la cola de revisión del panel, inspecciona las fotos privadas y aprueba o rechaza; sólo una aprobación vuelve activa la publicación.
+4. En el catálogo, el estudiante selecciona una publicación propia activa y otra publicación activa, y envía `POST /trueques/` con `publicacion_origen_id` y `publicacion_destino_id`.
+5. Los dos participantes consultan el historial paginado y se envían mensajes con `GET/POST /trueques/{id}/mensajes`. Redis distribuye los nuevos eventos mediante `WS /trueques/{id}/ws`, autenticado con el token como subprotocolo `bearer`.
+6. El receptor puede confirmar; cualquiera de los participantes puede completar. Rechazar o completar archiva la conversación y bloquea nuevos mensajes.
+
+No se aceptan mensajes ni conexiones WebSocket de usuarios ajenos al trueque. Las fotos de verificación no son públicas, se normalizan para retirar metadatos y la revisión inicial es humana. El código ayuda a evitar fotos recicladas, pero no demuestra por sí solo que un libro sea genuino. No se usa biometría ni se activa un modelo neuronal sin datos etiquetados revisados.
+
+---
+
+## 8. Guía de Puesta en Marcha y Despliegue
 
 ```bash
 # 1. Instalar dependencias
