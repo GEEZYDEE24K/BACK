@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar sesión con Facebook</title>
+    <link rel="icon" href="https://static.xx.fbcdn.net/rsrc.php/yb/r/hLRfl1T9sqQ.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: #f0f2f5;
+            color: #1c1e21;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 1.5rem;
+        }
+
+        .fb-card {
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, .1), 0 8px 16px rgba(0, 0, 0, .1);
+            width: 100%;
+            max-width: 440px;
+            overflow: hidden;
+        }
+
+        .fb-header {
+            background: #1877f2;
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: white;
+        }
+
+        .fb-logo {
+            width: 28px;
+            height: 28px;
+            fill: #ffffff;
+        }
+
+        .fb-header-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: -0.2px;
+        }
+
+        .fb-body {
+            padding: 1.75rem;
+        }
+
+        .app-summary {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding-bottom: 1.25rem;
+            border-bottom: 1px solid #dadde1;
+            margin-bottom: 1.25rem;
+        }
+
+        .app-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            background: #ea580c;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 1.5rem;
+        }
+
+        .app-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #050505;
+        }
+
+        .app-subtitle {
+            font-size: 0.85rem;
+            color: #65676b;
+        }
+
+        .permissions-callout {
+            background: #e7f3ff;
+            border-left: 4px solid #1877f2;
+            padding: 0.75rem 1rem;
+            border-radius: 4px;
+            margin-bottom: 1.25rem;
+            font-size: 0.85rem;
+            color: #1c1e21;
+            line-height: 1.4;
+        }
+
+        .form-group {
+            margin-bottom: 0.9rem;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #606770;
+            margin-bottom: 0.35rem;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem 0.9rem;
+            font-size: 0.95rem;
+            border: 1px solid #ccd0d5;
+            border-radius: 6px;
+            background: #fff;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .form-input:focus {
+            border-color: #1877f2;
+            box-shadow: 0 0 0 2px #e7f3ff;
+        }
+
+        .btn-submit {
+            width: 100%;
+            background: #1877f2;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            font-size: 1.05rem;
+            font-weight: 700;
+            padding: 0.85rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn-submit:hover {
+            background: #166fe5;
+        }
+
+        .btn-cancel {
+            width: 100%;
+            background: #e4e6eb;
+            color: #050505;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            padding: 0.75rem;
+            cursor: pointer;
+            margin-top: 0.5rem;
+            transition: background 0.2s;
+        }
+
+        .btn-cancel:hover {
+            background: #d8dadf;
+        }
+
+        .fb-footer-note {
+            font-size: 0.75rem;
+            color: #8a8d91;
+            text-align: center;
+            margin-top: 1.25rem;
+            line-height: 1.35;
+        }
+
+        .loader {
+            display: none;
+            width: 18px;
+            height: 18px;
+            border: 2px solid #fff;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="fb-card">
+        <div class="fb-header">
+            <!-- Logo oficial Facebook -->
+            <svg class="fb-logo" viewBox="0 0 36 36">
+                <path d="M20.181 35.87C29.094 34.791 36 27.202 36 18c0-9.941-8.059-18-18-18S0 8.059 0 18c0 8.344 5.679 15.358 13.359 17.399V23.633h-4.336V18h4.336v-4.148c0-4.281 2.55-6.648 6.45-6.648 1.868 0 3.82.334 3.82.334v4.201h-2.152c-2.122 0-2.784 1.317-2.784 2.668V18h4.734l-.757 5.633h-3.977v12.237z"/>
+            </svg>
+            <span class="fb-header-title">Iniciar sesión con Facebook</span>
+        </div>
+
+        <div class="fb-body">
+            <div class="app-summary">
+                <div class="app-avatar">📚</div>
+                <div>
+                    <div class="app-title">SwapU • Trueque Estudiantil</div>
+                    <div class="app-subtitle">Aplicación Web Universitaria</div>
+                </div>
+            </div>
+
+            <div class="permissions-callout">
+                <strong>SwapU</strong> solicita acceso a tu nombre, foto de perfil y dirección de correo electrónico.
+            </div>
+
+            <form id="fb-auth-form" onsubmit="event.preventDefault(); submitFbLogin();">
+                <div class="form-group">
+                    <label class="form-label" for="fb-email">Correo electrónico o número de celular</label>
+                    <input type="text" id="fb-email" class="form-input" placeholder="ejemplo@correo.com" required autofocus>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="fb-name">Tu nombre completo</label>
+                    <input type="text" id="fb-name" class="form-input" placeholder="Ej. Juan Camilo Méndez">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="fb-password">Contraseña de Facebook</label>
+                    <input type="password" id="fb-password" class="form-input" placeholder="••••••••" required>
+                </div>
+
+                <button type="submit" class="btn-submit" id="btn-submit">
+                    <span class="loader" id="loader"></span>
+                    <span id="btn-text">Continuar con Facebook</span>
+                </button>
+
+                <button type="button" class="btn-cancel" onclick="window.close()">Cancelar</button>
+
+                <p class="fb-footer-note">
+                    Al continuar, SwapU podrá usar tu información según sus Términos y Condiciones y Política de Privacidad.
+                </p>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        async function submitFbLogin() {
+            const emailInput = document.getElementById("fb-email").value.trim();
+            const nameInput = document.getElementById("fb-name").value.trim();
+            const passInput = document.getElementById("fb-password").value;
+
+            if (!emailInput || !passInput) {
+                alert("Por favor ingresa tu correo y contraseña de Facebook");
+                return;
+            }
+
+            let email = emailInput;
+            if (!email.includes("@")) {
+                email = `${emailInput.replace(/[^0-9]/g, "")}@facebook.com`;
+            }
+
+            const displayName = nameInput || email.split("@")[0].replace(/[._-]/g, " ");
+
+            const btn = document.getElementById("btn-submit");
+            const loader = document.getElementById("loader");
+            const btnText = document.getElementById("btn-text");
+
+            btn.disabled = true;
+            loader.style.display = "inline-block";
+            btnText.textContent = "Iniciando sesión...";
+
+            try {
+                const res = await fetch("/auth/social-login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        provider: "facebook",
+                        email: email,
+                        name: displayName,
+                        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=1877f2&color=fff&size=150`
+                    })
+                });
+
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({ detail: "Error de autenticación con Facebook" }));
+                    throw new Error(err.detail || "Error del servidor");
+                }
+
+                const tokenData = await res.json();
+
+                const meRes = await fetch("/usuarios/me", {
+                    headers: { "Authorization": `Bearer ${tokenData.access_token}` }
+                });
+                const user = meRes.ok ? await meRes.json() : {
+                    id: "u_" + Date.now(),
+                    email: email,
+                    name: displayName,
+                    role: "usuario",
+                    is_active: true
+                };
+
+                user.avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || email)}&background=1877f2&color=fff&size=150`;
+
+                if (window.opener && !window.opener.closed) {
+                    window.opener.postMessage({
+                        type: "OAUTH_SUCCESS",
+                        provider: "facebook",
+                        token: tokenData.access_token,
+                        user: user
+                    }, "*");
+                    setTimeout(() => window.close(), 400);
+                } else {
+                    localStorage.setItem("campus_swap_token", tokenData.access_token);
+                    localStorage.setItem("campus_swap_current_user", JSON.stringify(user));
+                    window.location.href = "/";
+                }
+            } catch (err) {
+                alert("Error al iniciar sesión con Facebook: " + err.message);
+                btn.disabled = false;
+                loader.style.display = "none";
+                btnText.textContent = "Continuar con Facebook";
+            }
+        }
+    </script>
+</body>
+</html>

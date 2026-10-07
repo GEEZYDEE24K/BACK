@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SwapU • Intercambio de Libros y Material</title>
+    <meta name="description" content="SwapU: plataforma de intercambio solidario de libros y material entre personas de toda Colombia. Matching inteligente, sin dinero, comunidad colaborativa.">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Main Stylesheet -->
+    <link rel="stylesheet" href="css/style.css?v=2.3">
+</head>
+<body>
+
+    <!-- ======================================================================
+         Header & Navigation (Desktop & Tablet)
+         ====================================================================== -->
+    <header class="app-header">
+        <div class="header-container">
+            <!-- Brand Logo -->
+            <div class="brand-wrapper" onclick="app.navigateTo('catalog')">
+                <div class="brand-icon">
+                    <i class="fa-solid fa-arrows-rotate"></i>
+                </div>
+                <div class="brand-info">
+                    <h1>SwapU</h1>
+                    <span>Intercambia libros · Conecta personas</span>
+                </div>
+            </div>
+
+            <!-- Desktop Nav Links -->
+            <nav class="nav-links">
+                <button class="nav-item active" data-nav="catalog" id="nav-btn-catalog">
+                    <i class="fa-solid fa-book"></i> Catálogo
+                </button>
+                <button class="nav-item" data-nav="matches" id="nav-btn-matches">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Matches
+                    <span class="nav-badge" id="matches-badge">3</span>
+                </button>
+                <button class="nav-item" data-nav="trades" id="nav-btn-trades">
+                    <i class="fa-solid fa-handshake"></i> Mis Trueques
+                </button>
+                <button class="nav-item" data-nav="chat" id="nav-btn-chat">
+                    <i class="fa-solid fa-comments"></i> Chat
+                    <span class="nav-badge" id="chat-badge" style="display: none;">0</span>
+                </button>
+                <button class="nav-item" data-nav="profile" id="nav-btn-profile">
+                    <i class="fa-solid fa-user"></i> Mi Perfil
+                </button>
+                <button class="nav-item" data-nav="admin" id="nav-admin-btn" style="display: none; color: #f87171;">
+                    <i class="fa-solid fa-shield-halved"></i> Panel Admin
+                </button>
+            </nav>
+
+            <!-- Header Actions -->
+            <div class="header-actions">
+                <!-- Theme Toggle -->
+                <button class="btn-icon" id="theme-toggle-btn" title="Cambiar tema">
+                    <i class="fa-solid fa-moon" id="theme-toggle-icon"></i>
+                </button>
+
+                <!-- Post Book Button -->
+                <button class="btn btn-primary btn-sm" onclick="app.openPublishBookModal()" id="btn-header-publish">
+                    <i class="fa-solid fa-plus"></i> Publicar Libro
+                </button>
+
+                <!-- Guest Actions (Cuando no hay sesión iniciada) -->
+                <div id="header-guest-box" style="display: flex; gap: 0.5rem; align-items: center;">
+                    <button class="btn btn-secondary btn-sm" onclick="app.openLoginModal()" id="btn-guest-login">
+                        <i class="fa-solid fa-arrow-right-to-bracket"></i> Iniciar Sesión
+                    </button>
+                    <button class="btn btn-primary btn-sm" onclick="app.openRegisterModal()" id="btn-guest-register">
+                        <i class="fa-solid fa-user-plus"></i> Registrarse
+                    </button>
+                </div>
+
+                <!-- User Profile Pill (Cuando la sesión está activa) -->
+                <div id="header-user-box" style="display: none; align-items: center; gap: 0.6rem;">
+                    <div class="user-profile-btn" onclick="app.navigateTo('profile')" id="btn-header-user">
+                        <img src="" class="user-avatar-mini" id="header-user-avatar" alt="Avatar">
+                        <span class="user-name-mini" id="header-user-name">Usuario</span>
+                        <span class="status-badge confirmado" style="padding: 0.1rem 0.4rem; font-size: 0.68rem;" id="header-user-role">MIEMBRO</span>
+                    </div>
+                    <button class="btn-icon" onclick="app.logout()" title="Cerrar Sesión" style="width: 36px; height: 36px; color: var(--danger);">
+                        <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ======================================================================
+         Main Views Container
+         ====================================================================== -->
+    <main class="main-content">
+
+        <!-- ------------------------------------------------------------------
+             VISTA 1: Catálogo de Libros y Material Académico
+             ------------------------------------------------------------------ -->
+        <section id="view-catalog" class="view-section active">
+            <!-- Hero Banner -->
+            <div class="hero-banner">
+                <div class="hero-content">
+                    <div class="hero-badge">
+                        <i class="fa-solid fa-book-open"></i> Comunidad de Lectores · SwapU
+                    </div>
+                    <h2 class="hero-title">Intercambia libros y material con personas cerca de ti</h2>
+                    <p class="hero-subtitle">Conecta con otros lectores, consigue los libros que necesitas e intercambia los que ya no usas — sin gastar dinero. Para estudiantes, profesionales, aficionados y cualquier persona que ame los libros.</p>
+                    <div class="hero-actions">
+                        <button class="btn btn-primary" onclick="app.openModal('publish-book-modal')">
+                            <i class="fa-solid fa-plus"></i> Publicar un Libro
+                        </button>
+                        <button class="btn btn-secondary" onclick="app.navigateTo('matches')">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Ver Matches Inteligentes
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Toolbar con Búsqueda y Píldoras de Categorías -->
+            <div class="catalog-toolbar">
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="book-search-input" class="search-input" placeholder="Buscar por título de libro, autor o material que buscas a cambio...">
+                </div>
+
+                <div class="category-pills">
+                    <button class="category-pill active" data-category="all">Todos los libros</button>
+                    <button class="category-pill" data-category="1">Ingeniería y Tecnología</button>
+                    <button class="category-pill" data-category="2">Medicina y Salud</button>
+                    <button class="category-pill" data-category="3">Ciencias Básicas</button>
+                    <button class="category-pill" data-category="4">Derecho y Políticas</button>
+                    <button class="category-pill" data-category="5">Economía y Negocios</button>
+                    <button class="category-pill" data-category="6">Humanidades</button>
+                </div>
+            </div>
+
+            <!-- Grid de Libros -->
+            <div class="books-grid" id="books-grid">
+                <!-- Renderizado dinámico desde app.js -->
+            </div>
+        </section>
+
+        <!-- ------------------------------------------------------------------
+             VISTA 2: Matches Inteligentes y Porcentajes
+             ------------------------------------------------------------------ -->
+        <section id="view-matches" class="view-section">
+            <div style="margin-bottom: 2rem;">
+                <h2>Coincidencias y Matches Inteligentes</h2>
+                <p style="color: var(--text-secondary); margin-top: 0.35rem;">
+                    Nuestro algoritmo correlaciona automáticamente los libros que tienes disponibles con los materiales que otras personas están buscando en tu zona.
+                </p>
+            </div>
+
+            <div class="matches-container" id="matches-list">
+                <!-- Renderizado dinámico con medidor de porcentaje circular -->
+            </div>
+        </section>
+
+        <!-- ------------------------------------------------------------------
+             VISTA 3: Propuestas y Seguimiento de Trueques
+             ------------------------------------------------------------------ -->
+        <section id="view-trades" class="view-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                <div>
+                    <h2>Gestor de Intercambios</h2>
+                    <p style="color: var(--text-secondary);">Supervisa el estado de tus propuestas, coordina entregas y califica a las personas con quienes intercambiaste.</p>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="app.navigateTo('catalog')">
+                    <i class="fa-solid fa-magnifying-glass"></i> Explorar más libros
+                </button>
+            </div>
+
+            <!-- Filtros de Estado -->
+            <div class="trade-tabs">
+                <button class="trade-tab active" data-trade-status="todos">Todos</button>
+                <button class="trade-tab" data-trade-status="propuesto">Propuestos 🟡</button>
+                <button class="trade-tab" data-trade-status="confirmado">Confirmados 🔵</button>
+                <button class="trade-tab" data-trade-status="completado">Completados 🟢</button>
+                <button class="trade-tab" data-trade-status="rechazado">Rechazados 🔴</button>
+            </div>
+
+            <!-- Listado de Trueques -->
+            <div id="trades-list">
+                <!-- Renderizado dinámico -->
+            </div>
+        </section>
+
+        <!-- ------------------------------------------------------------------
+             VISTA 4: Chat Asociado al Intercambio
+             ------------------------------------------------------------------ -->
+        <section id="view-chat" class="view-section">
+            <div style="margin-bottom: 1.5rem;">
+                <h2>Chat de Intercambio</h2>
+                <p style="color: var(--text-secondary);">Comunícate en tiempo real con la persona con quien realizas el trueque para acordar lugar y hora de entrega.</p>
+            </div>
+
+            <div class="chat-container">
+                <!-- Barra lateral de intercambios -->
+                <div class="chat-sidebar" id="chat-sidebar">
+                    <div class="chat-sidebar-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <h4 style="font-size: 0.95rem;">Tus Trueques Activos</h4>
+                        <button class="btn-icon chat-mobile-toggle" onclick="app.toggleChatSidebar()" style="display: none; width: 32px; height: 32px;" title="Cerrar lista">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    <div class="chat-list" id="chat-conversation-list">
+                        <!-- Renderizado dinámico -->
+                    </div>
+                </div>
+
+                <!-- Ventana principal de chat -->
+                <div class="chat-main">
+                    <div class="chat-main-header">
+                        <div style="display: flex; align-items: center; gap: 0.75rem; min-width: 0;">
+                            <button class="btn-icon chat-mobile-toggle" onclick="app.toggleChatSidebar()" title="Ver conversaciones" style="display: none; width: 34px; height: 34px; flex-shrink: 0;">
+                                <i class="fa-solid fa-bars"></i>
+                            </button>
+                            <div style="min-width: 0;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <h3 id="chat-partner-name" style="font-size: 1.05rem; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0;">Compañero</h3>
+                                    <span id="chat-partner-presence" class="chat-presence offline">
+                                        <span class="presence-dot"></span>
+                                        <span class="presence-text">Desconectado</span>
+                                    </span>
+                                </div>
+                                <span id="chat-trade-details" style="font-size: 0.76rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; margin-top: 2px;">Cargando trueque...</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+                            <button class="btn btn-secondary btn-sm" onclick="app.navigateTo('trades')">
+                                <i class="fa-solid fa-clipboard-check"></i> <span class="hide-mobile">Ver Estado</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Aviso de Chat Bloqueado hasta que el trueque esté en curso -->
+                    <div id="chat-lock-banner" class="chat-locked-notice" style="display: none;">
+                        <div class="chat-locked-icon">
+                            <i class="fa-solid fa-lock"></i>
+                        </div>
+                        <div>
+                            <strong style="color: var(--primary); display: block; font-size: 0.95rem;">Chat No Disponible Todavía</strong>
+                            <span style="font-size: 0.85rem; color: var(--text-secondary);">
+                                Este canal de comunicación se activará automáticamente cuando la otra persona <strong>confirme y acepte</strong> la propuesta y el trueque pase a estado <strong>"EN CURSO"</strong>.
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Mensajes -->
+                    <div class="chat-messages" id="chat-messages-body">
+                        <!-- Mensajes cargados por app.js -->
+                    </div>
+
+                    <!-- Indicador de escritura en tiempo real P2P -->
+                    <div id="chat-typing-indicator" class="chat-typing-wrapper" style="display: none;">
+                        <div class="chat-typing-bubble">
+                            <span class="typing-dot"></span>
+                            <span class="typing-dot"></span>
+                            <span class="typing-dot"></span>
+                        </div>
+                        <span id="chat-typing-text" class="chat-typing-text">Compañero está escribiendo...</span>
+                    </div>
+
+                    <!-- Sugerencias de respuestas rápidas de campus -->
+                    <div class="chat-quick-replies" id="chat-quick-replies-area">
+                        <button class="quick-reply-chip">¿Nos vemos en la Biblioteca San Benito?</button>
+                        <button class="quick-reply-chip">¿A qué hora te queda bien hoy en el campus?</button>
+                        <button class="quick-reply-chip">Ya estoy en la plazoleta central.</button>
+                        <button class="quick-reply-chip">El libro está en excelente estado.</button>
+                    </div>
+
+                    <!-- Caja de Envío -->
+                    <div class="chat-input-area" id="chat-input-container">
+                        <input type="text" id="chat-input" class="chat-input" placeholder="Escribe un mensaje para coordinar la entrega...">
+                        <button class="btn btn-primary" id="chat-send-btn" style="border-radius: var(--radius-full); width: 44px; height: 44px; padding: 0;">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- ------------------------------------------------------------------
+             VISTA 5: Perfil con Verificación y Reputación
+             ------------------------------------------------------------------ -->
+        <section id="view-profile" class="view-section">
+            <div class="profile-card">
+                <div class="profile-cover"></div>
+                <div class="profile-header-content">
+                    <img src="" id="prof-avatar-img" class="profile-avatar-large" alt="Avatar">
+                    <div class="profile-main-meta">
+                        <h2 class="profile-name">
+                            <span id="prof-name">Cargando...</span>
+                            <i class="fa-solid fa-circle-check verified-badge" title="Estudiante Verificado ✓"></i>
+                        </h2>
+                        <p style="color: var(--text-secondary); margin-top: 0.2rem;">
+                            <i class="fa-solid fa-briefcase" style="color: var(--primary); margin-right: 0.3rem;"></i>
+                            <span id="prof-carrera">Profesión / Carrera</span> • <span id="prof-univ">Organización</span>
+                        </p>
+                        <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.2rem;">
+                            <i class="fa-regular fa-envelope" style="margin-right: 0.3rem;"></i> <span id="prof-email">email@universidad.edu</span>
+                            <span style="margin: 0 0.5rem;">•</span>
+                            <i class="fa-brands fa-whatsapp" style="color: #25d366; margin-right: 0.3rem;"></i> <span id="prof-tel">+57 ...</span>
+                        </p>
+                    </div>
+                    <div>
+                        <button class="btn btn-secondary btn-sm" onclick="app.openEditProfile()">
+                            <i class="fa-solid fa-pen"></i> Editar Perfil
+                        </button>
+                    </div>
+                </div>
+
+                <div class="profile-stats-grid">
+                    <div class="profile-stat-box">
+                        <div class="stat-value" id="prof-stat-trades">14</div>
+                        <div class="stat-label">Trueques Completados</div>
+                    </div>
+                    <div class="profile-stat-box">
+                        <div class="stat-value" id="prof-stat-rating" style="color: #fbbf24;">4.9 ★</div>
+                        <div class="stat-label">Reputación Académica</div>
+                    </div>
+                    <div class="profile-stat-box">
+                        <div class="stat-value" style="color: var(--success);">100%</div>
+                        <div class="stat-label">Tasa de Confiabilidad</div>
+                    </div>
+                    <div class="profile-stat-box">
+                        <div class="stat-value" style="color: var(--secondary);">Verificado</div>
+                        <div class="stat-label">Estado de Comunidad</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Resumen de Reputación y Reseñas Recibidas -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                <div>
+                    <h3 style="margin-bottom: 1rem;">Mis Publicaciones Activas</h3>
+                    <div id="prof-my-books">
+                        <!-- Publicaciones propias -->
+                    </div>
+                </div>
+
+                <div>
+                    <h3 style="margin-bottom: 1rem;">Reseñas de Compañeros</h3>
+                    <div class="reviews-list" id="prof-reviews-list">
+                        <!-- Reseñas -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ------------------------------------------------------------------
+             VISTA 6: Panel de Administración (Acceso Restringido)
+             ------------------------------------------------------------------ -->
+        <section id="view-admin" class="view-section">
+            <!-- Pantalla de Acceso Denegado (si no es admin) -->
+            <div id="admin-restricted-view" class="admin-restricted-notice" style="display: none;">
+                <i class="fa-solid fa-lock" style="font-size: 3rem; color: var(--danger); margin-bottom: 1rem;"></i>
+                <h3>Acceso Restringido al Panel de Administración</h3>
+                <p style="color: var(--text-secondary); margin: 0.75rem 0 1.5rem 0;">
+                    Solo los usuarios con rol de <strong>Administrador</strong> tienen permisos para gestionar usuarios, roles y monitorizar la infraestructura.
+                </p>
+                <button class="btn btn-primary" onclick="app.loginAsAdmin()">
+                    <i class="fa-solid fa-key"></i> Iniciar sesión como Administrador (Demo)
+                </button>
+            </div>
+
+            <!-- Contenido del Panel Admin (Visible solo para rol admin) -->
+            <div id="admin-content-view">
+                <div class="admin-header">
+                    <div>
+                        <h2>Administración y moderación</h2>
+                        <p style="color: var(--text-secondary);">Supervisión de usuarios universitarios, auditoría y salud del backend FastAPI.</p>
+                    </div>
+                    <div id="admin-backend-status">
+                        <!-- Health badge -->
+                    </div>
+                </div>
+
+                <div id="admin-management-content">
+                <!-- KPIs -->
+                <div class="admin-kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-icon" style="background: var(--primary-light); color: var(--primary);">
+                            <i class="fa-solid fa-users"></i>
+                        </div>
+                        <div>
+                            <div style="font-size: 1.6rem; font-weight: 800;">148</div>
+                            <div style="font-size: 0.8rem; color: var(--text-secondary);">Estudiantes Registrados</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon" style="background: var(--warning-light); color: var(--warning);">
+                            <i class="fa-solid fa-book-bookmark"></i>
+                        </div>
+                        <div>
+                            <div style="font-size: 1.6rem; font-weight: 800;">86</div>
+                            <div style="font-size: 0.8rem; color: var(--text-secondary);">Libros en Oferta</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon" style="background: var(--success-light); color: var(--success);">
+                            <i class="fa-solid fa-handshake"></i>
+                        </div>
+                        <div>
+                            <div style="font-size: 1.6rem; font-weight: 800;">64</div>
+                            <div style="font-size: 0.8rem; color: var(--text-secondary);">Trueques Exitosos</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon" style="background: rgba(139, 92, 246, 0.12); color: var(--accent);">
+                            <i class="fa-solid fa-star"></i>
+                        </div>
+                        <div>
+                            <div style="font-size: 1.6rem; font-weight: 800;">4.92 ★</div>
+                            <div style="font-size: 0.8rem; color: var(--text-secondary);">Reputación Global</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabla de Gestión de Usuarios -->
+                <h3 style="margin-bottom: 1rem;">Directorio de Estudiantes y Roles</h3>
+                <div class="table-responsive">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Estudiante / Correo</th>
+                                <th>Carrera</th>
+                                <th>Rol Asignado</th>
+                                <th>Estado</th>
+                                <th>Acción Administrativa</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-users-table-body">
+                            <!-- Filas dinámicas -->
+                        </tbody>
+                    </table>
+                </div>
+                </div>
+
+                <h3 style="margin: 2rem 0 1rem;">Verificación de libros pendientes</h3>
+                <div id="admin-book-verification-queue" style="display:grid; gap:1rem;">
+                    <p style="color:var(--text-muted);">Cargando evidencias...</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ======================================================================
+         Mobile Bottom Navigation Bar
+         ====================================================================== -->
+    <div class="mobile-bottom-bar">
+        <div class="mobile-nav-items">
+            <button class="mobile-nav-item active" data-nav="catalog">
+                <i class="fa-solid fa-book"></i>
+                <span>Libros</span>
+            </button>
+            <button class="mobile-nav-item" data-nav="matches">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                <span>Matches</span>
+            </button>
+            <button class="mobile-nav-item" data-nav="trades">
+                <i class="fa-solid fa-handshake"></i>
+                <span>Trueques</span>
+            </button>
+            <button class="mobile-nav-item" data-nav="chat">
+                <i class="fa-solid fa-comments"></i>
+                <span>Chat</span>
+            </button>
+            <button class="mobile-nav-item" data-nav="profile">
+                <i class="fa-solid fa-user"></i>
+                <span>Perfil</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- ======================================================================
+         MODALES
+         ====================================================================== -->
+
+    <!-- Modal 1: Iniciar Sesión -->
+    <div class="modal-backdrop" id="login-modal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 0.6rem;">
+                    <i class="fa-solid fa-arrow-right-to-bracket" style="color: var(--primary); font-size: 1.25rem;"></i>
+                    <h3 style="margin: 0; font-size: 1.2rem; font-weight: 700;">Iniciar Sesión</h3>
+                </div>
+                <button class="btn-icon" onclick="app.closeModal('login-modal')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Social Login Buttons -->
+                <div style="text-align: center; margin-bottom: 0.75rem;">
+                    <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600;">Ingreso rápido con redes sociales:</span>
+                </div>
+                <div class="social-buttons-grid">
+                    <button class="social-btn google" onclick="app.socialLogin('google')" id="btn-login-google">
+                        <i class="fa-brands fa-google"></i> Google / Gmail
+                    </button>
+                    <button class="social-btn facebook" onclick="app.socialLogin('facebook')" id="btn-login-fb">
+                        <i class="fa-brands fa-facebook-f"></i> Facebook
+                    </button>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.25rem;">
+                    <hr style="flex: 1; border: none; border-top: 1px solid var(--border-light);">
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">o con correo electrónico</span>
+                    <hr style="flex: 1; border: none; border-top: 1px solid var(--border-light);">
+                </div>
+
+                <!-- Formulario de Login -->
+                <form id="auth-form-login" onsubmit="event.preventDefault(); app.submitLogin();">
+                    <div class="form-group">
+                        <label class="form-label">Correo electrónico:</label>
+                        <input type="email" id="login-email" class="form-control" placeholder="tu.correo@ejemplo.com" required autocomplete="email">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Contraseña:</label>
+                        <input type="password" id="login-password" class="form-control" placeholder="••••••••" required autocomplete="current-password">
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">
+                        <i class="fa-solid fa-arrow-right-to-bracket"></i> Iniciar Sesión
+                    </button>
+                </form>
+
+                <div style="text-align: center; margin-top: 1.25rem; font-size: 0.875rem; color: var(--text-secondary);">
+                    ¿No tienes una cuenta aún? 
+                    <a href="javascript:void(0)" onclick="app.switchToRegister()" style="color: var(--primary); font-weight: 600; text-decoration: underline;">Regístrate aquí</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 1B: Registrarse -->
+    <div class="modal-backdrop" id="register-modal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 0.6rem;">
+                    <i class="fa-solid fa-user-plus" style="color: var(--primary); font-size: 1.25rem;"></i>
+                    <h3 style="margin: 0; font-size: 1.2rem; font-weight: 700;">Crear Cuenta en SwapU</h3>
+                </div>
+                <button class="btn-icon" onclick="app.closeModal('register-modal')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Social Login Buttons -->
+                <div style="text-align: center; margin-bottom: 0.75rem;">
+                    <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600;">Registro rápido con redes sociales:</span>
+                </div>
+                <div class="social-buttons-grid">
+                    <button class="social-btn google" onclick="app.socialLogin('google')" id="btn-reg-google">
+                        <i class="fa-brands fa-google"></i> Google / Gmail
+                    </button>
+                    <button class="social-btn facebook" onclick="app.socialLogin('facebook')" id="btn-reg-fb">
+                        <i class="fa-brands fa-facebook-f"></i> Facebook
+                    </button>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.25rem;">
+                    <hr style="flex: 1; border: none; border-top: 1px solid var(--border-light);">
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">o completa tus datos</span>
+                    <hr style="flex: 1; border: none; border-top: 1px solid var(--border-light);">
+                </div>
+
+                <!-- Formulario de Registro -->
+                <form id="auth-form-register" onsubmit="event.preventDefault(); app.submitRegister();">
+                    <div class="form-group">
+                        <label class="form-label">Nombre completo:</label>
+                        <input type="text" id="reg-name" class="form-control" placeholder="Ej. Juan Pérez" required autocomplete="name">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Correo electrónico:</label>
+                        <input type="email" id="reg-email" class="form-control" placeholder="juan.perez@ejemplo.com" required autocomplete="email">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Contraseña:</label>
+                        <input type="password" id="reg-password" class="form-control" placeholder="Mínimo 6 caracteres" required autocomplete="new-password">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Teléfono o WhatsApp de contacto (opcional):</label>
+                        <input type="text" id="reg-tel" class="form-control" placeholder="+57 300 123 4567" autocomplete="tel">
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">
+                        <i class="fa-solid fa-user-plus"></i> Crear Cuenta
+                    </button>
+                </form>
+
+                <div style="text-align: center; margin-top: 1.25rem; font-size: 0.875rem; color: var(--text-secondary);">
+                    ¿Ya tienes una cuenta? 
+                    <a href="javascript:void(0)" onclick="app.switchToLogin()" style="color: var(--primary); font-weight: 600; text-decoration: underline;">Inicia sesión aquí</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 2: Publicar Libro -->
+    <div class="modal-backdrop" id="publish-book-modal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Publicar Libro para Intercambio</h3>
+                <button class="btn-icon" onclick="app.closeModal('publish-book-modal')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <form onsubmit="event.preventDefault(); app.submitNewBook();">
+                    <div class="form-group">
+                        <label class="form-label">Título del libro o material:</label>
+                        <input type="text" id="new-book-titulo" class="form-control" placeholder="Ej. Física Universitaria Vol. 1" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Autor(es):</label>
+                        <input type="text" id="new-book-autor" class="form-control" placeholder="Ej. Sears & Zemansky">
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label">Categoría:</label>
+                            <select id="new-book-categoria" class="form-control">
+                                <option value="1">Ingeniería y Tecnología</option>
+                                <option value="2">Medicina y Salud</option>
+                                <option value="3" selected>Ciencias Básicas</option>
+                                <option value="4">Derecho y Políticas</option>
+                                <option value="5">Economía y Negocios</option>
+                                <option value="6">Humanidades</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Estado del ejemplar:</label>
+                            <select id="new-book-estado" class="form-control">
+                                <option value="Nuevo">Nuevo (sellado)</option>
+                                <option value="Como nuevo" selected>Como nuevo</option>
+                                <option value="Buen estado">Buen estado</option>
+                                <option value="Aceptable">Aceptable</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label">ISBN (Opcional):</label>
+                            <input type="text" id="new-book-isbn" class="form-control" placeholder="978-...">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Edición:</label>
+                            <input type="text" id="new-book-edicion" class="form-control" placeholder="Ej. 13va Edición">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="color: var(--warning);">¿Qué libro o material buscas a cambio? (*):</label>
+                        <input type="text" id="new-book-buscado" class="form-control" placeholder="Ej. Álgebra Lineal de Grossman o libro afín" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Descripción adicional o notas:</label>
+                        <textarea id="new-book-descripcion" class="form-control" rows="3" placeholder="Indica si tiene subrayados, forro o anotaciones útiles..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Publicar en el Catálogo
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Verificación fotográfica -->
+    <!-- Modal: Verificación fotográfica con IA -->
+    <div class="modal-backdrop" id="book-verification-modal">
+        <div class="modal-box" style="max-width: 520px;">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 0.6rem;">
+                    <i class="fa-solid fa-brain" style="color: var(--primary); font-size: 1.25rem;"></i>
+                    <h3 style="margin: 0;">Verificación con Red Neuronal</h3>
+                </div>
+                <button class="btn-icon" onclick="app.closeModal('book-verification-modal')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <!-- Fase 1: Formulario y Código -->
+                <div id="book-verification-form-container">
+                    <p id="book-verification-instructions" style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.5;"></p>
+                    
+                    <div style="margin: 1.2rem 0; padding: 1.2rem; text-align: center; background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(168, 85, 247, 0.1)); border: 2px dashed var(--primary); border-radius: var(--radius-md);">
+                        <span style="display:block; color:var(--text-muted); font-size:.82rem; margin-bottom: 0.35rem; font-weight: 500;">
+                            <i class="fa-solid fa-pen"></i> Escribe este código en una hoja junto al libro:
+                        </span>
+                        <strong id="book-verification-code" style="font-size: 2.2rem; letter-spacing: .35rem; color: var(--primary); font-family: monospace;"></strong>
+                        <span style="display:block; color: #a5b4fc; font-size: .75rem; margin-top: 0.35rem;">
+                            La Red Neuronal y el OCR validarán el libro y este código
+                        </span>
+                    </div>
+
+                    <form id="book-verification-form" onsubmit="event.preventDefault(); app.submitBookVerification();">
+                        <input type="hidden" id="book-verification-publication-id">
+                        <input type="hidden" id="book-verification-id">
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight: 600;">
+                                <i class="fa-solid fa-camera"></i> Foto de portada con el código escrito al lado:
+                            </label>
+                            <input type="file" id="book-verification-cover" class="form-control" accept="image/jpeg,image/png,image/webp" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight: 600;">
+                                <i class="fa-solid fa-barcode"></i> Foto de página legal / ISBN con el código al lado:
+                            </label>
+                            <input type="file" id="book-verification-isbn" class="form-control" accept="image/jpeg,image/png,image/webp" required>
+                        </div>
+                        <button type="submit" id="book-verification-submit-btn" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem; display: flex; align-items: center; justify-content: center; gap: 0.6rem;">
+                            <i class="fa-solid fa-microchip"></i> Verificar con Red Neuronal
+                        </button>
+                    </form>
+                    <p style="color:var(--text-muted); font-size:.78rem; margin-top:1rem; line-height: 1.4;">
+                        <i class="fa-solid fa-shield-halved"></i> Fotos privadas protegidas. MobileNetV3 clasificará la imagen y EasyOCR autenticará el código sin intervención humana.
+                    </p>
+                </div>
+
+                <!-- Fase 2: Progreso de Análisis con IA -->
+                <div id="book-verification-ai-status" style="display: none; text-align: center; padding: 2rem 1rem;">
+                    <div style="width: 60px; height: 60px; margin: 0 auto 1.5rem auto; border: 4px solid rgba(99,102,241,0.2); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                    <h4 style="font-size: 1.15rem; margin-bottom: 0.5rem; color: var(--text-primary);">Ejecutando Red Neuronal...</h4>
+                    <p style="color: var(--text-secondary); font-size: 0.88rem; max-width: 380px; margin: 0 auto;" id="ai-loading-step">
+                        1. Clasificando estructura del libro con MobileNetV3...
+                    </p>
+                </div>
+
+                <!-- Fase 3: Resultado de la Verificación con IA -->
+                <div id="book-verification-ai-result" style="display: none; padding: 0.5rem 0;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-backdrop" id="review-book-photos-modal">
+        <div class="modal-box" style="max-width:900px;">
+            <div class="modal-header">
+                <h3>Fotos privadas del libro</h3>
+                <button class="btn-icon" onclick="app.closeVerificationPhotos()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;">
+                <figure><figcaption>Portada</figcaption><img id="review-book-cover-photo" alt="Portada del libro" style="width:100%;height:auto;"></figure>
+                <figure><figcaption>Página legal / ISBN</figcaption><img id="review-book-isbn-photo" alt="Página legal con ISBN" style="width:100%;height:auto;"></figure>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 3: Detalle de Libro -->
+    <div class="modal-backdrop" id="book-detail-modal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Detalle de la Publicación</h3>
+                <button class="btn-icon" onclick="app.closeModal('book-detail-modal')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" id="book-detail-content">
+                <!-- Contenido dinámico -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 4: Proponer Trueque -->
+    <div class="modal-backdrop" id="propose-trade-modal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Proponer Intercambio de Libros</h3>
+                <button class="btn-icon" onclick="app.closeModal('propose-trade-modal')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <form onsubmit="event.preventDefault(); app.submitTradeProposal();">
+                    <input type="hidden" id="trade-prop-user-id">
+                    <input type="hidden" id="trade-prop-publicacion-destino-id">
+                    <div class="form-group">
+                        <label class="form-label">Estudiante destinatario:</label>
+                        <input type="text" id="trade-prop-user-recibe" class="form-control" readonly style="opacity: 0.8;">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Libro que deseas recibir:</label>
+                        <input type="text" id="trade-prop-book-recibe" class="form-control" readonly style="opacity: 0.8; font-weight: 700;">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="color: var(--primary);">Publicación tuya que ofreces a cambio (*):</label>
+                        <select id="trade-prop-book-propone" class="form-control" required></select>
+                    </div>
+                    <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                        Podrás coordinar el punto de encuentro con la otra persona desde la conversación.
+                    </p>
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">
+                        <i class="fa-solid fa-paper-plane"></i> Enviar Propuesta de Trueque
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 5: Calificar Trueque -->
+    <div class="modal-backdrop" id="rate-trade-modal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Calificar Intercambio Post-Trueque</h3>
+                <button class="btn-icon" onclick="app.closeModal('rate-trade-modal')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text-secondary); margin-bottom: 1.5rem; text-align: center;">
+                    Tu valoración fomenta la confianza y fortalece la reputación comunitaria entre estudiantes.
+                </p>
+                <div style="display: flex; justify-content: center; gap: 0.75rem; font-size: 2.2rem; margin-bottom: 1.5rem; cursor: pointer;">
+                    <i class="fa-solid fa-star star-select-btn" data-star-val="1"></i>
+                    <i class="fa-solid fa-star star-select-btn" data-star-val="2"></i>
+                    <i class="fa-solid fa-star star-select-btn" data-star-val="3"></i>
+                    <i class="fa-solid fa-star star-select-btn" data-star-val="4"></i>
+                    <i class="fa-solid fa-star star-select-btn" data-star-val="5"></i>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Reseña o comentario sobre el intercambio:</label>
+                    <textarea id="rate-review-text" class="form-control" rows="3" placeholder="Ej. Muy puntual, el libro estaba tal como se describió en la publicación..."></textarea>
+                </div>
+                <button class="btn btn-primary" onclick="app.submitTradeRating()" style="width: 100%;">
+                    <i class="fa-solid fa-check"></i> Registrar Calificación
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 6: Editar Perfil -->
+    <div class="modal-backdrop" id="edit-profile-modal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Editar Información del Perfil</h3>
+                <button class="btn-icon" onclick="app.closeModal('edit-profile-modal')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <form onsubmit="event.preventDefault(); app.submitEditProfile();">
+                    <div class="form-group">
+                        <label class="form-label">Nombre completo:</label>
+                        <input type="text" id="edit-prof-name" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Ocupación o Profesión (opcional):</label>
+                        <input type="text" id="edit-prof-carrera" class="form-control" placeholder="Ej. Diseñador, Ingeniero, Estudiante...">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Ciudad o Ubicación (opcional):</label>
+                        <input type="text" id="edit-prof-univ" class="form-control" placeholder="Ej. Medellín, Envigado, Bello...">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Teléfono / WhatsApp de contacto:</label>
+                        <input type="text" id="edit-prof-tel" class="form-control">
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">
+                        <i class="fa-solid fa-floppy-disk"></i> Guardar Cambios
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="js/mockData.js?v=2.4"></script>
+    <script src="js/api.js?v=2.4"></script>
+    <script src="js/app.js?v=2.4"></script>
+</body>
+</html>
