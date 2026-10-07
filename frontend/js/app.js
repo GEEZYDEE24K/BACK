@@ -420,7 +420,6 @@ class CampusSwapApp {
         const isbn = document.getElementById("new-book-isbn")?.value;
         const edicion = document.getElementById("new-book-edicion")?.value;
         const directCover = document.getElementById("new-book-cover-direct")?.files[0];
-        const directIsbn = document.getElementById("new-book-isbn-direct")?.files[0];
 
         if (!titulo || !libro_buscado) {
             this.showToast("El título y el libro que buscas son obligatorios", "warning");
@@ -450,12 +449,11 @@ class CampusSwapApp {
             if (document.getElementById("new-book-buscado")) document.getElementById("new-book-buscado").value = "";
             if (document.getElementById("new-book-descripcion")) document.getElementById("new-book-descripcion").value = "";
             if (document.getElementById("new-book-cover-direct")) document.getElementById("new-book-cover-direct").value = "";
-            if (document.getElementById("new-book-isbn-direct")) document.getElementById("new-book-isbn-direct").value = "";
 
             this.showToast("¡Libro registrado! Pasando a verificación con Red Neuronal...", "success");
 
             // Iniciar flujo de verificación fotográfica con IA
-            await this.startBookVerification(newBook.id, directCover, directIsbn);
+            await this.startBookVerification(newBook.id, directCover);
         } catch (e) {
             this.showToast(e.message || "Error al publicar libro", "error");
         }
@@ -466,7 +464,7 @@ class CampusSwapApp {
         await this.startBookVerification(bookId);
     }
 
-    async startBookVerification(publicationId, preloadedCover = null, preloadedIsbn = null) {
+    async startBookVerification(publicationId, preloadedCover = null) {
         try {
             this.showToast("Generando código único para verificación con IA...", "info");
             const challenge = await api.createBookVerificationChallenge(publicationId);
@@ -486,15 +484,19 @@ class CampusSwapApp {
 
             const coverInput = document.getElementById("book-verification-cover");
             const isbnInput = document.getElementById("book-verification-isbn");
-            if (coverInput) coverInput.value = "";
+            if (coverInput) {
+                coverInput.value = "";
+                if (preloadedCover) {
+                    try {
+                        const dt = new DataTransfer();
+                        dt.items.add(preloadedCover);
+                        coverInput.files = dt.files;
+                    } catch (err) {}
+                }
+            }
             if (isbnInput) isbnInput.value = "";
 
             this.openModal("book-verification-modal");
-
-            // Si el usuario ya adjuntó fotos directamente en el formulario de publicación:
-            if (preloadedCover && preloadedIsbn) {
-                await this.executeAIVerification(publicationId, challenge.verificacion_id, challenge.codigo, preloadedCover, preloadedIsbn);
-            }
         } catch (e) {
             this.showToast(e.message || "No se pudo iniciar el proceso de verificación", "error");
         }
