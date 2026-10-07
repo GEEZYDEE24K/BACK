@@ -1,16 +1,16 @@
 /* ==========================================================================
-   Plataforma de Trueque Estudiantil - Universidad de San Buenaventura Medellín
-   Identidad Visual Institucional Bonaventuriana (Naranja San Buenaventura & Carbón)
+   Plataforma de Trueque - SwapU
+   Identidad Visual y Sistema de Estilos
    ========================================================================== */
 
 :root {
-    /* Paleta Institucional Universidad de San Buenaventura Medellín */
-    --primary: #ea580c;           /* Naranja Oficial San Buenaventura */
-    --primary-hover: #c2410c;     /* Naranja Profundo Bonaventuriano */
+    /* Paleta Principal */
+    --primary: #ea580c;           /* Naranja Principal */
+    --primary-hover: #c2410c;     /* Naranja Oscuro */
     --primary-light: rgba(234, 88, 12, 0.16);
-    --secondary: #292524;         /* Carbón Franciscano */
+    --secondary: #292524;         /* Carbón */
     --secondary-hover: #1c1917;
-    --accent: #f59e0b;            /* Dorado / Ámbar Franciscano */
+    --accent: #f59e0b;            /* Dorado / Ámbar */
     --accent-light: rgba(245, 158, 11, 0.15);
     
     --success: #10b981;
@@ -21,7 +21,7 @@
     --danger-light: rgba(239, 68, 68, 0.12);
     --info: #0284c7;
 
-    /* Theme Tokens - Dark Mode Bonaventuriano (Default) */
+    /* Theme Tokens - Dark Mode (Default) */
     --bg-main: #0c0a09;
     --bg-surface: #1c1917;
     --bg-surface-elevated: #292524;

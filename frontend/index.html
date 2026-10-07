@@ -270,11 +270,11 @@
                         <span id="chat-typing-text" class="chat-typing-text">Compañero está escribiendo...</span>
                     </div>
 
-                    <!-- Sugerencias de respuestas rápidas de campus -->
+                    <!-- Sugerencias de respuestas rápidas -->
                     <div class="chat-quick-replies" id="chat-quick-replies-area">
-                        <button class="quick-reply-chip">¿Nos vemos en la Biblioteca San Benito?</button>
-                        <button class="quick-reply-chip">¿A qué hora te queda bien hoy en el campus?</button>
-                        <button class="quick-reply-chip">Ya estoy en la plazoleta central.</button>
+                        <button class="quick-reply-chip">¿Dónde nos encontramos para la entrega?</button>
+                        <button class="quick-reply-chip">¿A qué hora te queda bien hoy?</button>
+                        <button class="quick-reply-chip">Ya estoy en el punto de encuentro.</button>
                         <button class="quick-reply-chip">El libro está en excelente estado.</button>
                     </div>
 
@@ -301,14 +301,14 @@
                     <div class="profile-main-meta">
                         <h2 class="profile-name">
                             <span id="prof-name">Cargando...</span>
-                            <i class="fa-solid fa-circle-check verified-badge" title="Estudiante Verificado ✓"></i>
+                            <i class="fa-solid fa-circle-check verified-badge" title="Usuario Verificado ✓"></i>
                         </h2>
                         <p style="color: var(--text-secondary); margin-top: 0.2rem;">
                             <i class="fa-solid fa-briefcase" style="color: var(--primary); margin-right: 0.3rem;"></i>
                             <span id="prof-carrera">Profesión / Carrera</span> • <span id="prof-univ">Organización</span>
                         </p>
                         <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.2rem;">
-                            <i class="fa-regular fa-envelope" style="margin-right: 0.3rem;"></i> <span id="prof-email">email@universidad.edu</span>
+                            <i class="fa-regular fa-envelope" style="margin-right: 0.3rem;"></i> <span id="prof-email">usuario@ejemplo.com</span>
                             <span style="margin: 0 0.5rem;">•</span>
                             <i class="fa-brands fa-whatsapp" style="color: #25d366; margin-right: 0.3rem;"></i> <span id="prof-tel">+57 ...</span>
                         </p>
@@ -379,7 +379,7 @@
                 <div class="admin-header">
                     <div>
                         <h2>Administración y moderación</h2>
-                        <p style="color: var(--text-secondary);">Supervisión de usuarios universitarios, auditoría y salud del backend FastAPI.</p>
+                        <p style="color: var(--text-secondary);">Supervisión de usuarios, auditoría y salud del backend FastAPI.</p>
                     </div>
                     <div id="admin-backend-status">
                         <!-- Health badge -->
@@ -395,7 +395,7 @@
                         </div>
                         <div>
                             <div style="font-size: 1.6rem; font-weight: 800;">148</div>
-                            <div style="font-size: 0.8rem; color: var(--text-secondary);">Estudiantes Registrados</div>
+                            <div style="font-size: 0.8rem; color: var(--text-secondary);">Usuarios Registrados</div>
                         </div>
                     </div>
                     <div class="kpi-card">
@@ -428,13 +428,13 @@
                 </div>
 
                 <!-- Tabla de Gestión de Usuarios -->
-                <h3 style="margin-bottom: 1rem;">Directorio de Estudiantes y Roles</h3>
+                <h3 style="margin-bottom: 1rem;">Directorio de Usuarios y Roles</h3>
                 <div class="table-responsive">
                     <table class="admin-table">
                         <thead>
                             <tr>
                                 <th>ID</th>
-                                <th>Estudiante / Correo</th>
+                                <th>Usuario / Correo</th>
                                 <th>Carrera</th>
                                 <th>Rol Asignado</th>
                                 <th>Estado</th>
@@ -773,7 +773,7 @@
                     <input type="hidden" id="trade-prop-user-id">
                     <input type="hidden" id="trade-prop-publicacion-destino-id">
                     <div class="form-group">
-                        <label class="form-label">Estudiante destinatario:</label>
+                        <label class="form-label">Destinatario:</label>
                         <input type="text" id="trade-prop-user-recibe" class="form-control" readonly style="opacity: 0.8;">
                     </div>
                     <div class="form-group">
@@ -804,7 +804,7 @@
             </div>
             <div class="modal-body">
                 <p style="color: var(--text-secondary); margin-bottom: 1.5rem; text-align: center;">
-                    Tu valoración fomenta la confianza y fortalece la reputación comunitaria entre estudiantes.
+                    Tu valoración fomenta la confianza y fortalece la reputación comunitaria en la plataforma.
                 </p>
                 <div style="display: flex; justify-content: center; gap: 0.75rem; font-size: 2.2rem; margin-bottom: 1.5rem; cursor: pointer;">
                     <i class="fa-solid fa-star star-select-btn" data-star-val="1"></i>

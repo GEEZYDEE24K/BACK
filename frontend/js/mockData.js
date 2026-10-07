@@ -442,7 +442,7 @@ const MOCK_TRUEQUES = [
         fecha_propuesta: "2026-09-28T16:00:00Z",
         fecha_confirmacion: null,
         fecha_completado: null,
-        lugar_entrega: "Biblioteca Central - Sala de estudio"
+        lugar_entrega: "Punto de encuentro céntrico"
     },
     {
         id: 102,
@@ -457,7 +457,7 @@ const MOCK_TRUEQUES = [
         fecha_propuesta: "2026-09-26T10:00:00Z",
         fecha_confirmacion: "2026-09-27T08:30:00Z",
         fecha_completado: null,
-        lugar_entrega: "Cafetería del edificio de artes (12:30 PM)"
+        lugar_entrega: "Cafetería central (12:30 PM)"
     },
     {
         id: 103,
@@ -472,7 +472,7 @@ const MOCK_TRUEQUES = [
         fecha_propuesta: "2026-09-15T11:00:00Z",
         fecha_confirmacion: "2026-09-16T09:00:00Z",
         fecha_completado: "2026-09-18T15:20:00Z",
-        lugar_entrega: "Entrada principal del campus",
+        lugar_entrega: "Punto de encuentro acordado",
         calificacion: {
             estrellas: 5,
             resena: "¡Excelente intercambio! El libro estaba impecable y llegó puntual.",
