@@ -27,7 +27,6 @@ class PublicacionUpdate(BaseModel):
     estado_libro: Optional[str] = None
     descripcion: Optional[str] = None
     libro_buscado: Optional[str] = None
-    estado_publicacion: Optional[str] = Field(None, description="Estado: activa, inactiva, completada")
 
 
 class PublicacionRead(PublicacionBase):

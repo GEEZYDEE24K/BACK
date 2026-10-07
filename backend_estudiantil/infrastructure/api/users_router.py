@@ -78,7 +78,7 @@ async def create_user(
     current_user: dict = Depends(get_current_user),
 ):
     """Creación administrativa de usuarios (solo admin)."""
-    if current_user.get("role") != "admin":
+    if current_user.get("role") not in ("admin", "administrador"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permisos insuficientes")
     try:
         user = await service.create_user(payload)
@@ -107,7 +107,7 @@ async def update_user(
     current_user: dict = Depends(get_current_user),
 ):
     """Actualiza la información de un usuario (propio o por admin)."""
-    if current_user["id"] != user_id and current_user.get("role") != "admin":
+    if current_user["id"] != user_id and current_user.get("role") not in ("admin", "administrador"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permisos insuficientes")
     try:
         user = await service.update_user(user_id, payload)
@@ -122,7 +122,7 @@ async def delete_user(
     current_user: dict = Depends(get_current_user),
 ):
     """Eliminación de usuario (solo admin)."""
-    if current_user.get("role") != "admin":
+    if current_user.get("role") not in ("admin", "administrador"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permisos insuficientes")
     try:
         await service.delete_user(user_id)

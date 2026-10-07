@@ -2,7 +2,12 @@ from typing import List, Optional
 from sqlalchemy.future import select
 from sqlalchemy import or_
 
-from backend_estudiantil.adapters.db import MatchORM, PublicacionORM, get_session_factory
+from backend_estudiantil.adapters.db import (
+    MatchORM,
+    PublicacionORM,
+    TruequeORM,
+    get_session_factory,
+)
 from backend_estudiantil.domain.models.match import Match
 from backend_estudiantil.ports.repositories.match_repository import MatchRepository
 
@@ -52,7 +57,13 @@ class SQLAlchemyMatchRepository(MatchRepository):
                     or_(
                         MatchORM.publicacion_origen_id.in_(pub_ids),
                         MatchORM.publicacion_destino_id.in_(pub_ids),
-                    )
+                    ),
+                    ~MatchORM.id.in_(
+                        select(TruequeORM.match_id).where(
+                            TruequeORM.estado != "rechazado",
+                            TruequeORM.match_id.is_not(None),
+                        )
+                    ),
                 )
             )
             orms = result.scalars().all()

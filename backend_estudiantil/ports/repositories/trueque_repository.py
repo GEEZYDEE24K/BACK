@@ -18,5 +18,21 @@ class TruequeRepository(ABC):
         ...
 
     @abstractmethod
+    async def create_from_publications(
+        self,
+        usuario_propone_id: int,
+        publicacion_origen_id: int,
+        publicacion_destino_id: int,
+        usuario_recibe_id: Optional[int] = None,
+    ) -> Trueque:
+        ...
+
+    @abstractmethod
+    async def create_from_match(
+        self, usuario_propone_id: int, match_id: int, usuario_recibe_id: Optional[int] = None
+    ) -> Trueque:
+        ...
+
+    @abstractmethod
     async def update(self, trueque: Trueque) -> Trueque:
         ...

@@ -58,6 +58,12 @@ async def obtener_trueque(
 
 
 @router.post("/", response_model=TruequeRead, status_code=status.HTTP_201_CREATED, summary="Proponer trueque")
+@router.post(
+    "/proponer",
+    response_model=TruequeRead,
+    status_code=status.HTTP_201_CREATED,
+    include_in_schema=False,
+)
 async def proponer_trueque(
     payload: TruequeCreate,
     current_user: dict = Depends(get_current_user),
@@ -69,8 +75,12 @@ async def proponer_trueque(
             usuario_propone_id=current_user["id"],
             usuario_recibe_id=payload.usuario_recibe_id,
             match_id=payload.match_id,
+            publicacion_origen_id=payload.publicacion_origen_id,
+            publicacion_destino_id=payload.publicacion_destino_id,
         )
         return _trueque_to_read(trueque)
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 

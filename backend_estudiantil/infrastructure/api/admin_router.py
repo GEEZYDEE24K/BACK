@@ -21,8 +21,8 @@ async def promote_user(
     """Promote a user to the *moderador* role.
     Only an *admin* can perform this action.
     """
-    if current_user.get("role") != "admin":
+    if current_user.get("role") not in ("admin", "administrador"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     # Promote using service method
     promoted_user = await service.promote_to_moderator(user_id)
-    return {"msg": f"User {user_id} promoted to {promoted_user.role}"}
+    return {"msg": f"Usuario {user_id} promovido a {promoted_user.rol}"}

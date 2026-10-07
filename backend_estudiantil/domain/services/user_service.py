@@ -31,7 +31,7 @@ class UserService:
             correo_institucional=payload.email,
             password_hash=hashed,
             name=payload.name,
-            rol=payload.role or "usuario",
+            rol="administrador" if (payload.role or "").lower() in ("admin", "administrador") else "usuario",
             estado_cuenta="activo",
             verificado_comunidad=True,
             programa_area=getattr(payload, "carrera", None),

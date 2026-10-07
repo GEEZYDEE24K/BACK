@@ -26,16 +26,62 @@ from backend_estudiantil.infrastructure.api.publicaciones_router import router a
 from backend_estudiantil.infrastructure.api.matches_router import router as matches_router
 from backend_estudiantil.infrastructure.api.trueques_router import router as trueques_router
 from backend_estudiantil.infrastructure.api.calificaciones_router import router as calificaciones_router
+from backend_estudiantil.infrastructure.api.chat_router import router as chat_router
+from backend_estudiantil.infrastructure.api.verificaciones_router import router as verificaciones_router
 
-from backend_estudiantil.adapters.db import Base, get_engine, verificar_conexion_db
+import os
+from fastapi.staticfiles import StaticFiles
+
+from backend_estudiantil.adapters.db import (
+    Base,
+    CategoriaORM,
+    get_engine,
+    get_session_factory,
+    verificar_conexion_db,
+)
+from sqlalchemy import select, text
+
+CATEGORIAS_INICIALES = (
+    (1, "Ingeniería y Tecnología"),
+    (2, "Medicina y Salud"),
+    (3, "Ciencias Básicas"),
+    (4, "Derecho y Políticas"),
+    (5, "Economía y Negocios"),
+    (6, "Humanidades"),
+)
+
+
+async def inicializar_categorias():
+    factory = get_session_factory()
+    async with factory() as session:
+        for categoria_id, nombre in CATEGORIAS_INICIALES:
+            categoria = await session.get(CategoriaORM, categoria_id)
+            if categoria is None:
+                existente = await session.execute(
+                    select(CategoriaORM).where(CategoriaORM.nombre == nombre)
+                )
+                if existente.scalar_one_or_none() is None:
+                    session.add(CategoriaORM(id=categoria_id, nombre=nombre))
+        await session.commit()
+
+    if get_engine().dialect.name == "postgresql":
+        async with get_engine().begin() as connection:
+            await connection.execute(
+                text(
+                    "SELECT setval(pg_get_serial_sequence('categorias', 'id'), "
+                    "COALESCE((SELECT MAX(id) FROM categorias), 1))"
+                )
+            )
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Gestor de ciclo de vida moderno de FastAPI (Lifespan)."""
+    import asyncio
     # Inicialización de tablas en la base de datos
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    await inicializar_categorias()
     yield
     # Limpieza o cierre de conexiones si es necesario al apagar el servidor
 
@@ -61,9 +107,12 @@ app.add_middleware(
 async def rate_limit_handler(request, exc):
     return JSONResponse(status_code=429, content={"detail": "Rate limit exceeded"})
 
+from backend_estudiantil.infrastructure.api.facebook_oauth_router import router as facebook_oauth_router
+
 # Inclusión de Routers (Auth, Usuarios, Admin, Google OAuth)
 app.include_router(auth_router)
 app.include_router(google_oauth_router)
+app.include_router(facebook_oauth_router)
 app.include_router(users_router)
 app.include_router(admin_router)
 # Routers del dominio principal de trueque
@@ -71,6 +120,8 @@ app.include_router(publicaciones_router)
 app.include_router(matches_router)
 app.include_router(trueques_router)
 app.include_router(calificaciones_router)
+app.include_router(chat_router)
+app.include_router(verificaciones_router)
 
 # Instrumentación de métricas con Prometheus
 Instrumentator().instrument(app).expose(app)
@@ -86,3 +137,8 @@ async def health_db_check():
     """Verificación directa de la conexión activa a la base de datos."""
     resultado = await verificar_conexion_db()
     return {"database": resultado}
+
+# Montaje de frontend estático si existe
+frontend_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "frontend")
+if os.path.exists(frontend_dir):
+    app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")

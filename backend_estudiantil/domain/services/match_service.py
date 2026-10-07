@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List
 
 from backend_estudiantil.domain.models.match import Match
 from backend_estudiantil.domain.models.publicacion import Publicacion
@@ -52,7 +52,7 @@ class MatchService:
 
             # Calcular puntuación de similitud básica
             puntuacion = self._calcular_puntuacion(pub_origen, pub_destino)
-            tipo = "exacta" if puntuacion >= 90.0 else "parcial"
+            tipo = "exacta" if puntuacion >= 90.0 else "similar"
 
             nuevo_match = Match(
                 publicacion_origen_id=pub_origen.id,

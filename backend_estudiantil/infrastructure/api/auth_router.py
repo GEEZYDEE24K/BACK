@@ -1,14 +1,26 @@
+from typing import Optional
+from pydantic import BaseModel, EmailStr
 from fastapi import APIRouter, Depends, HTTPException, Response, status, Request
 from datetime import timedelta
 
 from backend_estudiantil.adapters.db.sqlalchemy_user_repository import SQLAlchemyUserRepository
 from backend_estudiantil.adapters.security.jwt_authenticator import JWTAuthenticator
 from backend_estudiantil.config.settings import settings
+from backend_estudiantil.domain.models.user import User
 from backend_estudiantil.domain.services.user_service import UserService
 from backend_estudiantil.ports.repositories.user_repository import UserRepository
 from backend_estudiantil.ports.security.authenticator import Authenticator
 from backend_estudiantil.schemas.auth import LoginRequest, Token
 from backend_estudiantil.schemas.user import UserCreate, UserRead
+
+class SocialAuthRequest(BaseModel):
+    provider: str
+    email: EmailStr
+    name: Optional[str] = None
+    avatar: Optional[str] = None
+    telefono: Optional[str] = None
+    carrera: Optional[str] = None
+    universidad: Optional[str] = None
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -60,9 +72,9 @@ async def login(
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cuenta inactiva o suspendida")
 
-    # Crear tokens incluyendo rol
-    access_token = auth.create_access_token({"sub": user.id, "role": user.rol})
-    refresh_token = auth.create_refresh_token({"sub": user.id, "role": user.rol})
+    # Crear tokens incluyendo rol (sub debe ser string según el estándar JWT)
+    access_token = auth.create_access_token({"sub": str(user.id), "role": user.rol})
+    refresh_token = auth.create_refresh_token({"sub": str(user.id), "role": user.rol})
 
     # Guardar refresh_token en cookie segura HttpOnly
     response.set_cookie(
@@ -112,3 +124,51 @@ async def logout(response: Response):
         samesite=settings.COOKIE_SAMESITE,
     )
     return {"message": "Sesión cerrada correctamente"}
+
+@router.post("/social-login", response_model=Token)
+async def social_login(
+    payload: SocialAuthRequest,
+    response: Response,
+    service: UserService = Depends(get_user_service),
+    auth: Authenticator = Depends(get_authenticator),
+):
+    """Autenticación o registro federado con Google, X (Twitter) o Facebook."""
+    repo = service.repo
+    user = await repo.get_by_email(payload.email)
+    if not user:
+        user = User(
+            correo_institucional=payload.email,
+            password_hash="",  # Sin contraseña local requerida para auth federada
+            name=payload.name or payload.email.split("@")[0],
+            rol="usuario",
+            estado_cuenta="activo",
+            verificado_comunidad=True,
+            telefono=payload.telefono or "",
+            programa_area=payload.carrera or "Estudiante Universitario",
+            universidad=payload.universidad or "Universidad",
+        )
+        user = await repo.create(user)
+    else:
+        if payload.name and (not user.nombre or user.nombre == "Estudiante"):
+            user.name = payload.name
+            await repo.update(user)
+
+    role = user.rol
+    access_token = auth.create_access_token({"sub": str(user.id), "role": role})
+    refresh_token = auth.create_refresh_token({"sub": str(user.id), "role": role})
+
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=settings.COOKIE_HTTPONLY,
+        secure=settings.COOKIE_SECURE,
+        samesite=settings.COOKIE_SAMESITE,
+        max_age=int(timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS).total_seconds()),
+    )
+
+    return Token(
+        access_token=access_token,
+        token_type="bearer",
+        role=role,
+        expires_in=float(timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES).total_seconds()),
+    )

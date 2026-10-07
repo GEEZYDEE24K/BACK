@@ -3,14 +3,14 @@ from fastapi.responses import RedirectResponse, HTMLResponse
 import json
 
 from backend_estudiantil.adapters.db.sqlalchemy_user_repository import SQLAlchemyUserRepository
-from backend_estudiantil.adapters.security.google_oauth2_authenticator import GoogleOAuth2Authenticator
+from backend_estudiantil.adapters.security.facebook_oauth2_authenticator import FacebookOAuth2Authenticator
 from backend_estudiantil.adapters.security.jwt_authenticator import JWTAuthenticator
 from backend_estudiantil.config.settings import settings
 from backend_estudiantil.domain.models.user import User
 from backend_estudiantil.ports.repositories.user_repository import UserRepository
 from backend_estudiantil.schemas.auth import Token
 
-router = APIRouter(prefix="/auth/google", tags=["auth"])
+router = APIRouter(prefix="/auth/facebook", tags=["auth"])
 
 def get_user_repository() -> UserRepository:
     return SQLAlchemyUserRepository()
@@ -18,41 +18,39 @@ def get_user_repository() -> UserRepository:
 def get_jwt_authenticator() -> JWTAuthenticator:
     return JWTAuthenticator()
 
-def get_google_authenticator() -> GoogleOAuth2Authenticator:
-    return GoogleOAuth2Authenticator()
+def get_facebook_authenticator() -> FacebookOAuth2Authenticator:
+    return FacebookOAuth2Authenticator()
 
 @router.get("/login")
-async def google_login(authenticator: GoogleOAuth2Authenticator = Depends(get_google_authenticator)):
-    """Redirige al usuario a la URL de autorización de Google OAuth2."""
+async def facebook_login(authenticator: FacebookOAuth2Authenticator = Depends(get_facebook_authenticator)):
     url = await authenticator.get_authorization_url()
     return RedirectResponse(url)
 
 @router.get("/callback")
-async def google_callback(
+async def facebook_callback(
     code: str,
     response: Response,
     repo: UserRepository = Depends(get_user_repository),
     jwt_auth: JWTAuthenticator = Depends(get_jwt_authenticator),
-    google_auth: GoogleOAuth2Authenticator = Depends(get_google_authenticator),
+    facebook_auth: FacebookOAuth2Authenticator = Depends(get_facebook_authenticator),
 ):
-    """Callback de Google OAuth2. Intercambia el código por tokens y perfil, y responde con HTML para la ventana popup."""
-    token_data = await google_auth.exchange_code(code)
-    access_token_google = token_data.get("access_token")
-    if not access_token_google:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing access token from Google")
+    token_data = await facebook_auth.exchange_code(code)
+    access_token = token_data.get("access_token")
+    if not access_token:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing access token from Facebook")
 
-    userinfo = await google_auth.get_userinfo(access_token_google)
+    userinfo = await facebook_auth.get_userinfo(access_token)
     email = userinfo.get("email")
     name = userinfo.get("name")
+    
     if not email:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Google account has no email")
+        email = f"{userinfo.get('id')}@facebook.local"
 
-    # Si no existe, crear al usuario automáticamente
     user = await repo.get_by_email(email)
     if not user:
         user = User(
             correo_institucional=email,
-            password_hash="",  # Sin contraseña para usuarios federados con Google
+            password_hash="",
             name=name,
             rol="usuario",
             estado_cuenta="activo",
@@ -60,13 +58,11 @@ async def google_callback(
         )
         await repo.create(user)
 
-    # Emitir tokens JWT
     role = user.rol
     payload = {"sub": str(user.id), "role": role}
     access_jwt = jwt_auth.create_access_token(payload)
     refresh_jwt = jwt_auth.create_refresh_token(payload)
 
-    # Setear cookie segura de refresh token
     response.set_cookie(
         key="refresh_token",
         value=refresh_jwt,
@@ -82,10 +78,9 @@ async def google_callback(
         "name": user.name,
         "role": user.rol,
         "is_active": True,
-        "avatar": f"https://ui-avatars.com/api/?name={name.replace(' ', '+') if name else 'U'}&background=ea4335&color=fff&size=150"
+        "avatar": f"https://ui-avatars.com/api/?name={name.replace(' ', '+') if name else 'U'}&background=1877F2&color=fff&size=150"
     }
 
-    # Render HTML for popup
     html_content = f"""
     <!DOCTYPE html>
     <html>
@@ -94,7 +89,7 @@ async def google_callback(
     <script>
         window.opener.postMessage({{
             type: "OAUTH_SUCCESS",
-            provider: "google",
+            provider: "facebook",
             token: "{access_jwt}",
             user: {json.dumps(user_data)}
         }}, "*");

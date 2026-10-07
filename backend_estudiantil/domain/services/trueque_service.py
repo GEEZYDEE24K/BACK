@@ -18,20 +18,26 @@ class TruequeService:
     async def proponer_trueque(
         self,
         usuario_propone_id: int,
-        usuario_recibe_id: int,
+        usuario_recibe_id: Optional[int] = None,
         match_id: Optional[int] = None,
+        publicacion_origen_id: Optional[int] = None,
+        publicacion_destino_id: Optional[int] = None,
     ) -> Trueque:
         """Crea una nueva propuesta de trueque entre dos usuarios."""
-        if usuario_propone_id == usuario_recibe_id:
-            raise ValueError("Un usuario no puede proponer un trueque consigo mismo")
-
-        trueque = Trueque(
-            match_id=match_id,
-            usuario_propone_id=usuario_propone_id,
-            usuario_recibe_id=usuario_recibe_id,
-            estado="propuesto",
-        )
-        return await self.repo.create(trueque)
+        if (publicacion_origen_id is None) != (publicacion_destino_id is None):
+            raise ValueError("Debes indicar ambas publicaciones para proponer el trueque")
+        if publicacion_origen_id is not None and publicacion_destino_id is not None:
+            return await self.repo.create_from_publications(
+                usuario_propone_id,
+                publicacion_origen_id,
+                publicacion_destino_id,
+                usuario_recibe_id,
+            )
+        if match_id is not None:
+            return await self.repo.create_from_match(
+                usuario_propone_id, match_id, usuario_recibe_id
+            )
+        raise ValueError("Debes indicar un match o las publicaciones del trueque")
 
     async def obtener_trueque(self, trueque_id: int) -> Trueque:
         trueque = await self.repo.get_by_id(trueque_id)

@@ -1,4 +1,5 @@
 from typing import List, Optional
+# pyrefly: ignore [missing-import]
 from sqlalchemy.future import select
 
 from backend_estudiantil.adapters.db import CalificacionORM, get_session_factory

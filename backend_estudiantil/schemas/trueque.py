@@ -7,7 +7,7 @@ class MatchRead(BaseModel):
     id: int
     publicacion_origen_id: int
     publicacion_destino_id: int
-    tipo_match: str = Field(description="Tipo: exacta, parcial")
+    tipo_match: str = Field(description="Tipo: exacta, similar")
     puntuacion: float = Field(description="Puntuación de coincidencia entre 0 y 100")
     fecha_creacion: Optional[datetime] = None
 
@@ -15,8 +15,16 @@ class MatchRead(BaseModel):
 
 
 class TruequeCreate(BaseModel):
-    usuario_recibe_id: int = Field(..., description="ID del usuario que recibirá la propuesta")
+    usuario_recibe_id: Optional[int] = Field(
+        None, description="ID del usuario receptor (opcional si se indican publicaciones)"
+    )
     match_id: Optional[int] = Field(None, description="ID del match asociado (opcional)")
+    publicacion_origen_id: Optional[int] = Field(
+        None, gt=0, description="Publicación propia que se ofrece"
+    )
+    publicacion_destino_id: Optional[int] = Field(
+        None, gt=0, description="Publicación activa que se solicita"
+    )
 
 
 class TruequeAccion(BaseModel):

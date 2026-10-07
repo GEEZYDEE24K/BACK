@@ -36,7 +36,7 @@ class PublicacionService:
             estado_libro=estado_libro or "Buen estado",
             descripcion=descripcion,
             libro_buscado=libro_buscado,
-            estado_publicacion="activa",
+            estado_publicacion="inactiva",
         )
         return await self.repo.create(publicacion)
 
@@ -72,6 +72,9 @@ class PublicacionService:
         for campo, valor in datos.items():
             if hasattr(pub, campo) and valor is not None:
                 setattr(pub, campo, valor)
+
+        if datos:
+            pub.estado_publicacion = "inactiva"
 
         return await self.repo.update(pub)
 

@@ -1,6 +1,7 @@
 from typing import List, Optional
 from sqlalchemy.future import select
-from sqlalchemy import or_
+from sqlalchemy import or_, cast, String
+
 
 from backend_estudiantil.adapters.db import PublicacionORM, get_session_factory
 from backend_estudiantil.domain.models.publicacion import Publicacion
@@ -49,7 +50,8 @@ class SQLAlchemyPublicacionRepository(PublicacionRepository):
         busqueda: Optional[str] = None,
     ) -> List[Publicacion]:
         async with self.session_factory() as session:
-            query = select(PublicacionORM).where(PublicacionORM.estado_publicacion == "activa")
+            query = select(PublicacionORM).where(cast(PublicacionORM.estado_publicacion, String) == "activa")
+
 
             if categoria_id is not None:
                 query = query.where(PublicacionORM.categoria_id == categoria_id)
