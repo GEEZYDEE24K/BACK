@@ -17,6 +17,14 @@ class GoogleOAuth2Authenticator:
         Uses ``settings.GOOGLE_CLIENT_ID``, ``settings.GOOGLE_REDIRECT_URI`` and
         ``settings.GOOGLE_SCOPES`` (defaults to ``openid email profile``).
         """
+        if not settings.GOOGLE_CLIENT_ID.strip() or not settings.GOOGLE_CLIENT_SECRET.strip():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=(
+                    "Inicio con Google no configurado. Define GOOGLE_CLIENT_ID y "
+                    "GOOGLE_CLIENT_SECRET en el entorno del backend."
+                ),
+            )
         params = {
             "client_id": settings.GOOGLE_CLIENT_ID,
             "redirect_uri": settings.GOOGLE_REDIRECT_URI,
@@ -33,6 +41,11 @@ class GoogleOAuth2Authenticator:
         Returns the JSON payload from Google which contains ``access_token``
         (and optionally ``refresh_token`` and ``id_token``).
         """
+        if not settings.GOOGLE_CLIENT_ID.strip() or not settings.GOOGLE_CLIENT_SECRET.strip():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Inicio con Google no configurado en el backend.",
+            )
         token_url = "https://oauth2.googleapis.com/token"
         data = {
             "code": code,
