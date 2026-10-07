@@ -110,6 +110,8 @@ class CampusSwapApp {
             chatInput.addEventListener("keypress", (e) => {
                 if (e.key === "Enter") this.sendChatMessage();
             });
+            // Indicador de escritura: envía typing al backend por WS
+            chatInput.addEventListener("input", () => this._onChatInputTyping());
         }
 
         // Chips de respuesta rápida en chat
@@ -142,6 +144,10 @@ class CampusSwapApp {
     }
 
     navigateTo(viewName) {
+        // Cerrar WebSocket si salimos de la vista de chat
+        if (this.currentView === 'chat' && viewName !== 'chat') {
+            this._closeChatWebSocket(true);
+        }
         this.currentView = viewName;
 
         // Actualizar active en nav
@@ -1103,57 +1109,173 @@ class CampusSwapApp {
         }
     }
 
-    connectChatWebSocket(tradeId) {
+    // -------------------------------------------------------------------------
+    // WebSocket Chat — Tiempo Real
+    // -------------------------------------------------------------------------
+
+    /** Cierra el socket actual de forma intencional (no reconecta) */
+    _closeChatWebSocket(intentional = false) {
+        if (intentional) this._wsIntentionalClose = true;
+        if (this._wsPingTimer) { clearInterval(this._wsPingTimer); this._wsPingTimer = null; }
+        if (this._wsReconnectTimer) { clearTimeout(this._wsReconnectTimer); this._wsReconnectTimer = null; }
+        if (this._typingTimer) { clearTimeout(this._typingTimer); this._typingTimer = null; }
         if (this.chatWs) {
+            this.chatWs.onclose = null; // Evitar reconexión desde el handler
             this.chatWs.close();
             this.chatWs = null;
         }
+        this._hideTypingIndicator();
+        this.updateChatPresence([]);
+    }
+
+    connectChatWebSocket(tradeId) {
+        // Nunca dos sockets abiertos al mismo tiempo
+        this._closeChatWebSocket(true);
+        this._wsIntentionalClose = false;
+        this._wsReconnectDelay = 1000;
+        this._wsTradeId = tradeId;
+        this._doConnectWs(tradeId);
+    }
+
+    _doConnectWs(tradeId) {
         const token = api.getToken();
-        if (!token) {
-            this.showToast("Inicia sesión para abrir la conversación", "warning");
-            return;
-        }
+        if (!token) return;
+
+        // Solo conectar si el trueque no está rechazado o completado sin chat
+        const trade = this.trades.find(t => t.id === tradeId);
+        if (trade && trade.estado === 'rechazado') return;
+
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsHost = api.baseUrl.replace(/^http(s?):\/\//, '');
-        this.chatWs = new WebSocket(
+        const wsHost = api.baseUrl.replace(/^https?:\/\//, '');
+        const ws = new WebSocket(
             `${wsProtocol}//${wsHost}/trueques/${tradeId}/ws`,
             ["bearer", token]
         );
-        
-        this.chatWs.onmessage = (event) => {
+        this.chatWs = ws;
+
+        ws.onopen = () => {
+            this._wsReconnectDelay = 1000; // Resetear backoff al conectar
+            // Ping cada 25 segundos para mantener la conexión viva
+            this._wsPingTimer = setInterval(() => {
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: "ping" }));
+                }
+            }, 25000);
+        };
+
+        ws.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
                 if (!data) return;
 
-                // 1. Manejo de presencia y usuarios conectados
-                if (data.type === "room_state" || data.type === "presence") {
-                    this.updateChatPresence(data.online_users);
-                    return;
-                }
+                switch (data.type) {
+                    case "room_state":
+                        // Al conectarse: estado inicial de la sala
+                        this._wsCurrenUserId = data.current_user_id;
+                        this.updateChatPresence(data.online_users);
+                        break;
 
-                // 2. Indicadores de escritura
-                if (data.type === "typing") {
-                    return;
-                }
+                    case "presence":
+                        // Alguien entró o salió
+                        this.updateChatPresence(data.online_users);
+                        break;
 
-                // 3. Ignorar errores o mensajes de sistema sin texto
-                if (data.type === "error" || !data.contenido) {
-                    return;
-                }
+                    case "typing": {
+                        // Ignorar mis propios eventos de typing (el servidor los reenvía)
+                        const myId = this._wsCurrenUserId
+                            || Number(api.getCurrentUser()?.id);
+                        if (Number(data.user_id) === myId) break;
+                        if (data.is_typing) {
+                            this._showTypingIndicator(data.user_name);
+                        } else {
+                            this._hideTypingIndicator();
+                        }
+                        break;
+                    }
 
-                // 4. Mensajes de texto normales
-                this.appendMessageToUI(data);
+                    case "pong":
+                        // Respuesta al ping — no hace falta acción
+                        break;
+
+                    case "error":
+                        console.warn("WS error del servidor:", data.detail);
+                        break;
+
+                    case "message":
+                        // Mensaje de texto: pintar en el chat sin recargar historial
+                        if (data.contenido) this.appendMessageToUI(data);
+                        break;
+
+                    default:
+                        break;
+                }
             } catch (e) {
                 console.error("Error parsing WS message:", e);
             }
         };
 
-        this.chatWs.onclose = event => {
+        ws.onclose = (event) => {
+            if (this._wsPingTimer) { clearInterval(this._wsPingTimer); this._wsPingTimer = null; }
+            this._hideTypingIndicator();
             this.updateChatPresence([]);
-            if (event.code === 4401 || event.code === 4403) {
-                this.showToast("No tienes permiso para abrir esta conversación", "error");
+
+            // Códigos que NO deben reconectar
+            const noReconnect = [4401, 4403, 4404, 1011];
+            if (noReconnect.includes(event.code)) {
+                if (event.code === 4401) this.showToast("Sesión expirada en el chat. Inicia sesión de nuevo.", "error");
+                if (event.code === 4403) this.showToast("No eres participante de este trueque.", "error");
+                if (event.code === 4404) this.showToast("El trueque no existe.", "error");
+                return;
             }
+
+            // Cierre intencional (cambio de trueque, logout, cambio de vista)
+            if (this._wsIntentionalClose) return;
+
+            // Reconexión con espera creciente (1s → 2s → 4s → … → 15s máx)
+            const delay = Math.min(this._wsReconnectDelay, 15000);
+            this._wsReconnectDelay = Math.min(delay * 2, 15000);
+            this._wsReconnectTimer = setTimeout(() => {
+                if (!this._wsIntentionalClose && this._wsTradeId === tradeId) {
+                    this._doConnectWs(tradeId);
+                }
+            }, delay);
         };
+
+        ws.onerror = () => {
+            // El evento onclose se disparará a continuación — no hacer nada extra
+        };
+    }
+
+    /** Envía evento typing al backend cuando el usuario escribe */
+    _onChatInputTyping() {
+        if (!this.chatWs || this.chatWs.readyState !== WebSocket.OPEN) return;
+
+        // Enviar typing=true si no lo hemos enviado aún
+        if (!this._isTyping) {
+            this._isTyping = true;
+            this.chatWs.send(JSON.stringify({ type: "typing", is_typing: true }));
+        }
+
+        // Resetear el timer: después de 2s de inactividad enviar typing=false
+        if (this._typingTimer) clearTimeout(this._typingTimer);
+        this._typingTimer = setTimeout(() => {
+            this._isTyping = false;
+            if (this.chatWs && this.chatWs.readyState === WebSocket.OPEN) {
+                this.chatWs.send(JSON.stringify({ type: "typing", is_typing: false }));
+            }
+        }, 2000);
+    }
+
+    _showTypingIndicator(userName) {
+        const indicator = document.getElementById("chat-typing-indicator");
+        const text = document.getElementById("chat-typing-text");
+        if (indicator) indicator.style.display = "flex";
+        if (text) text.textContent = `${this.escapeHtml(userName || 'Compañero')} está escribiendo...`;
+    }
+
+    _hideTypingIndicator() {
+        const indicator = document.getElementById("chat-typing-indicator");
+        if (indicator) indicator.style.display = "none";
     }
 
     appendMessageToUI(msg) {
@@ -1278,15 +1400,39 @@ class CampusSwapApp {
         const text = input.value.trim();
         input.value = "";
 
-        try {
-            const message = await api.sendChatMessage(this.activeTradeChatId, text);
-            this.appendMessageToUI(message);
-            if (message.realtime_delivery === "unavailable") {
-                this.showToast("Mensaje guardado en base de datos", "info");
+        // Apagar indicador de typing propio al enviar
+        if (this._typingTimer) { clearTimeout(this._typingTimer); this._typingTimer = null; }
+        if (this._isTyping) {
+            this._isTyping = false;
+            if (this.chatWs && this.chatWs.readyState === WebSocket.OPEN) {
+                this.chatWs.send(JSON.stringify({ type: "typing", is_typing: false }));
             }
-        } catch (e) {
-            input.value = text;
-            this.showToast(e.message || "Error al enviar mensaje", "error");
+        }
+
+        // Enviar por WebSocket si está disponible; de lo contrario, usar REST
+        if (this.chatWs && this.chatWs.readyState === WebSocket.OPEN) {
+            try {
+                this.chatWs.send(JSON.stringify({ type: "message", contenido: text }));
+                // El servidor nos reenviará el mensaje con su ID → appendMessageToUI lo deduplicará
+            } catch (e) {
+                // WS falló — intentar por REST como respaldo
+                try {
+                    const message = await api.sendChatMessage(this.activeTradeChatId, text);
+                    this.appendMessageToUI(message);
+                } catch (restErr) {
+                    input.value = text;
+                    this.showToast(restErr.message || "Error al enviar mensaje", "error");
+                }
+            }
+        } else {
+            // Sin WebSocket: usar REST directamente
+            try {
+                const message = await api.sendChatMessage(this.activeTradeChatId, text);
+                this.appendMessageToUI(message);
+            } catch (e) {
+                input.value = text;
+                this.showToast(e.message || "Error al enviar mensaje", "error");
+            }
         }
     }
 
@@ -1723,10 +1869,7 @@ class CampusSwapApp {
     }
 
     async logout() {
-        if (this.chatWs) {
-            this.chatWs.close();
-            this.chatWs = null;
-        }
+        this._closeChatWebSocket(true);
         await api.logout();
         this.updateUserBadge();
         this.showToast("Has cerrado sesión", "info");
