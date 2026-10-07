@@ -3,6 +3,7 @@ from datetime import timedelta
 
 from backend_estudiantil.adapters.db.sqlalchemy_user_repository import SQLAlchemyUserRepository
 from backend_estudiantil.adapters.security.jwt_authenticator import JWTAuthenticator
+from backend_estudiantil.config.settings import settings
 from backend_estudiantil.domain.services.user_service import UserService
 from backend_estudiantil.ports.repositories.user_repository import UserRepository
 from backend_estudiantil.ports.security.authenticator import Authenticator
@@ -22,65 +23,92 @@ def get_authenticator() -> Authenticator:
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 async def register(payload: UserCreate, service: UserService = Depends(get_user_service)):
+    """Registro de nuevo estudiante o usuario en la plataforma."""
     try:
         user = await service.create_user(payload)
         return UserRead(
-            id=user.id,
-            email=user.email,
+            id=str(user.id),
+            email=user.correo_institucional,
             name=user.name,
-            created_at=user.created_at.isoformat(),
-            updated_at=user.updated_at.isoformat(),
+            role=user.rol,
+            is_active=user.is_active,
+            telefono=user.telefono,
+            carrera=user.programa_area,
+            universidad=user.universidad,
+            created_at=user.fecha_registro.isoformat() if hasattr(user.fecha_registro, "isoformat") else str(user.fecha_registro),
+            updated_at=user.fecha_registro.isoformat() if hasattr(user.fecha_registro, "isoformat") else str(user.fecha_registro),
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 @router.post("/login", response_model=Token)
-async def login(payload: LoginRequest, service: UserService = Depends(get_user_service), auth: Authenticator = Depends(get_authenticator)):
-    # Fetch user by email
+async def login(
+    payload: LoginRequest,
+    response: Response,
+    service: UserService = Depends(get_user_service),
+    auth: Authenticator = Depends(get_authenticator),
+):
+    """Inicio de sesión con validación bcrypt y emisión de JWT + Cookie HttpOnly."""
     repo = service.repo
     user = await repo.get_by_email(payload.email)
     if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    # Verify password (same hash method as service)
-    hashed_input = service._hash_password(payload.password)
-    if hashed_input != user.hashed_password:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    # Create tokens including role
-    access_token = auth.create_access_token({"sub": user.id, "role": user.role})
-    refresh_token = auth.create_refresh_token({"sub": user.id, "role": user.role})
-    # Set refresh token as HttpOnly cookie
-    response = Response()
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales inválidas")
+
+    if not service._verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales inválidas")
+
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cuenta inactiva o suspendida")
+
+    # Crear tokens incluyendo rol
+    access_token = auth.create_access_token({"sub": user.id, "role": user.rol})
+    refresh_token = auth.create_refresh_token({"sub": user.id, "role": user.rol})
+
+    # Guardar refresh_token en cookie segura HttpOnly
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
-        httponly=True,
-        secure=True,
-        samesite="strict",
-        max_age=timedelta(days=7).total_seconds(),
+        httponly=settings.COOKIE_HTTPONLY,
+        secure=settings.COOKIE_SECURE,
+        samesite=settings.COOKIE_SAMESITE,
+        max_age=int(timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS).total_seconds()),
     )
-    # Return token response including role
-    token_response = Token(
+
+    return Token(
         access_token=access_token,
         token_type="bearer",
         role=user.role,
-        expires_in=timedelta(minutes=30).total_seconds(),
+        expires_in=float(timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES).total_seconds()),
     )
-    response.body = token_response.json().encode()
-    response.media_type = "application/json"
-    return response
 
 @router.post("/refresh", response_model=Token)
-async def refresh_token(response: Response, request: Request, auth: Authenticator = Depends(get_authenticator)):
+async def refresh_token(request: Request, auth: Authenticator = Depends(get_authenticator)):
+    """Renovación del Access Token a partir de la cookie HttpOnly."""
     refresh_token = request.cookies.get("refresh_token")
     if not refresh_token:
-        raise HTTPException(status_code=401, detail="Refresh token missing")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token faltante en cookies")
     try:
         payload = auth.decode_token(refresh_token)
         user_id = payload.get("sub")
         role = payload.get("role", "user")
     except ValueError as e:
-        raise HTTPException(status_code=401, detail=str(e))
-    # Create new access token including role
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
     access_token = auth.create_access_token({"sub": user_id, "role": role})
-    # Return new access token with role (keep same refresh cookie)
-    return Token(access_token=access_token, token_type="bearer", role=role, expires_in=timedelta(minutes=30).total_seconds())
+    return Token(
+        access_token=access_token,
+        token_type="bearer",
+        role=role,
+        expires_in=float(timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES).total_seconds()),
+    )
+
+@router.post("/logout", status_code=status.HTTP_200_OK)
+async def logout(response: Response):
+    """Cierre de sesión: invalida y elimina la cookie de refresh token."""
+    response.delete_cookie(
+        key="refresh_token",
+        httponly=settings.COOKIE_HTTPONLY,
+        secure=settings.COOKIE_SECURE,
+        samesite=settings.COOKIE_SAMESITE,
+    )
+    return {"message": "Sesión cerrada correctamente"}

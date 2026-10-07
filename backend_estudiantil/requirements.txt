@@ -11,3 +11,5 @@ pytest>=8.2.0
 pytest-asyncio>=0.23.6
 ruff>=0.5.0
 black>=24.4.2
+slowapi>=0.1.9
+prometheus_fastapi_instrumentator>=5.12.0

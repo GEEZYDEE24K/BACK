@@ -14,9 +14,12 @@ def get_user_repository() -> UserRepository:
 def get_authenticator() -> JWTAuthenticator:
     return JWTAuthenticator()
 
-async def get_current_user(token: str = Depends(oauth2_scheme),
-                           repo: UserRepository = Depends(get_user_repository),
-                           authenticator = Depends(get_authenticator)) -> Optional[dict]:
+async def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    repo: UserRepository = Depends(get_user_repository),
+    authenticator: JWTAuthenticator = Depends(get_authenticator),
+) -> dict:
+    """Extrae y valida el usuario actual a partir del token JWT de autorización."""
     try:
         payload = authenticator.decode_token(token)
         user_id = payload.get("sub")
@@ -25,6 +28,19 @@ async def get_current_user(token: str = Depends(oauth2_scheme),
         user = await repo.get_by_id(user_id)
         if not user:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-        return {"id": user.id, "email": user.email, "role": payload.get("role", "user"), "name": user.name}
+        if not user.is_active:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user account")
+        return {
+            "id": user.id,
+            "email": user.correo_institucional,
+            "role": user.rol or payload.get("role", "usuario"),
+            "name": user.name,
+            "is_active": user.is_active,
+            "telefono": user.telefono,
+            "carrera": user.programa_area,
+            "universidad": user.universidad,
+            "created_at": user.fecha_registro.isoformat() if hasattr(user.fecha_registro, "isoformat") else str(user.fecha_registro),
+            "updated_at": user.fecha_registro.isoformat() if hasattr(user.fecha_registro, "isoformat") else str(user.fecha_registro),
+        }
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))

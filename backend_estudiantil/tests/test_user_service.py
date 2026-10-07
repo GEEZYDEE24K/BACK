@@ -2,11 +2,9 @@ import pytest
 from backend_estudiantil.domain.services.user_service import UserService
 from backend_estudiantil.domain.models.user import User
 from backend_estudiantil.schemas.user import UserCreate, UserUpdate
-import uuid
-from datetime import datetime
 
 class InMemoryUserRepository:
-    """Simple in‑memory repo used for unit testing the service."""
+    """Repositorio en memoria para pruebas unitarias del servicio de usuarios."""
     def __init__(self):
         self.store = {}
 
@@ -27,6 +25,9 @@ class InMemoryUserRepository:
     async def delete(self, user_id: str):
         self.store.pop(user_id, None)
 
+    async def list(self, skip: int = 0, limit: int = 100):
+        return list(self.store.values())[skip:skip+limit]
+
 @pytest.fixture
 def repo():
     return InMemoryUserRepository()
@@ -42,12 +43,12 @@ async def test_create_user(service):
     assert user.id is not None
     assert user.email == payload.email
     assert user.name == payload.name
-    # Password should be stored hashed
+    # La contraseña debe almacenarse hasheada
     assert user.hashed_password != payload.password
 
 @pytest.mark.asyncio
 async def test_get_user(service):
-    payload = UserCreate(email="bob@example.com", password="pwd", name="Bob")
+    payload = UserCreate(email="bob@example.com", password="password123", name="Bob")
     created = await service.create_user(payload)
     fetched = await service.get_user(created.id)
     assert fetched.id == created.id
@@ -55,7 +56,7 @@ async def test_get_user(service):
 
 @pytest.mark.asyncio
 async def test_update_user(service):
-    payload = UserCreate(email="alice@example.com", password="pwd", name="Alice")
+    payload = UserCreate(email="alice@example.com", password="password123", name="Alice")
     user = await service.create_user(payload)
     update_payload = UserUpdate(name="Alice Updated")
     updated = await service.update_user(user.id, update_payload)
@@ -63,7 +64,7 @@ async def test_update_user(service):
 
 @pytest.mark.asyncio
 async def test_delete_user(service):
-    payload = UserCreate(email="del@example.com", password="pwd", name="Del")
+    payload = UserCreate(email="del@example.com", password="password123", name="Del")
     user = await service.create_user(payload)
     await service.delete_user(user.id)
     with pytest.raises(ValueError):
