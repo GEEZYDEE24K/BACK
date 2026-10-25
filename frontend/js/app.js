@@ -1517,6 +1517,17 @@ class CampusSwapApp {
             return;
         }
 
+        // Intentar refrescar el perfil desde el backend si hay token
+        if (api.getToken()) {
+            try {
+                const fresh = await api.getProfile();
+                if (fresh) {
+                    api.setCurrentUser({ ...api.getCurrentUser(), ...fresh });
+                    user = api.getCurrentUser();
+                }
+            } catch (e) { /* usar datos locales */ }
+        }
+
         const nameEl = document.getElementById("prof-name");
         const univEl = document.getElementById("prof-univ");
         const carreraEl = document.getElementById("prof-carrera");
@@ -1525,15 +1536,64 @@ class CampusSwapApp {
         const avatarEl = document.getElementById("prof-avatar-img");
         const statTrades = document.getElementById("prof-stat-trades");
         const statRating = document.getElementById("prof-stat-rating");
+        const statComunidad = document.getElementById("prof-stat-comunidad");
+        const semWrap = document.getElementById("prof-semestre-wrap");
+        const semEl = document.getElementById("prof-semestre");
+        const badgeComunidad = document.getElementById("prof-badge-comunidad");
+        const badgePerfil = document.getElementById("prof-badge-perfil");
+        const carnetCard = document.getElementById("prof-carnet-card");
+        const statPerfilEl = document.getElementById("prof-stat-perfil");
 
-        if (nameEl) nameEl.textContent = user.name;
-        if (univEl) univEl.textContent = user.universidad || "Universidad";
-        if (carreraEl) carreraEl.textContent = user.carrera || "Carrera";
-        if (emailEl) emailEl.textContent = user.email;
-        if (telEl) telEl.textContent = user.telefono || "No especificado";
-        if (avatarEl) avatarEl.src = user.avatar || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80";
-        if (statTrades) statTrades.textContent = user.trueques_completados || "14";
-        if (statRating) statRating.textContent = user.reputacion?.promedio ? Number(user.reputacion.promedio).toFixed(1) + " ★" : "4.9 ★";
+        if (nameEl) nameEl.textContent = user.name || "Estudiante";
+        if (univEl) univEl.textContent = user.universidad || "Universidad no especificada";
+        if (carreraEl) carreraEl.textContent = user.carrera || "Carrera no especificada";
+        if (emailEl) emailEl.textContent = user.email || "";
+        if (telEl) telEl.textContent = user.telefono || "No registrado";
+        if (avatarEl) avatarEl.src = user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'U')}&background=ea580c&color=fff&size=150`;
+        if (statTrades) statTrades.textContent = user.trueques_completados ?? 0;
+        if (statRating) statRating.textContent = user.reputacion?.promedio ? Number(user.reputacion.promedio).toFixed(1) + " ★" : "5.0 ★";
+
+        // Semestre
+        if (user.semestre && semWrap && semEl) {
+            semEl.textContent = `${user.semestre}° Semestre`;
+            semWrap.style.display = "inline";
+        } else if (semWrap) {
+            semWrap.style.display = "none";
+        }
+
+        // Badge de verificación de comunidad / estudiante
+        const verificado = user.verificado_comunidad || user.verificado;
+        if (badgeComunidad) {
+            if (verificado) {
+                badgeComunidad.innerHTML = '<i class="fa-solid fa-graduation-cap" style="margin-right:0.3rem;"></i>Estudiante Verificado';
+                badgeComunidad.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
+                badgeComunidad.style.color = '#fff';
+            } else {
+                badgeComunidad.innerHTML = '<i class="fa-solid fa-user-check" style="margin-right:0.3rem;"></i>Comunidad General';
+                badgeComunidad.style.background = 'linear-gradient(135deg, #64748b, #475569)';
+                badgeComunidad.style.color = '#fff';
+            }
+        }
+        if (statComunidad) statComunidad.textContent = verificado ? "Estudiante ✓" : "General";
+        if (statComunidad) statComunidad.style.color = verificado ? "var(--success)" : "var(--primary)";
+
+        // Badge de completitud de perfil
+        const completo = user.perfil_completo || (user.carrera && user.universidad && user.telefono);
+        if (badgePerfil) {
+            if (completo) {
+                badgePerfil.innerHTML = '<i class="fa-solid fa-circle-check" style="margin-right:0.3rem;"></i>Perfil Completo';
+                badgePerfil.style.background = 'rgba(99,102,241,0.15)';
+                badgePerfil.style.color = '#818cf8';
+            } else {
+                badgePerfil.innerHTML = '<i class="fa-solid fa-circle-half-stroke" style="margin-right:0.3rem;"></i>Perfil Incompleto';
+                badgePerfil.style.background = 'rgba(156,163,175,0.15)';
+                badgePerfil.style.color = 'var(--text-muted)';
+            }
+        }
+        if (statPerfilEl) statPerfilEl.textContent = completo ? "Completo ✓" : "Incompleto";
+
+        // Mostrar tarjeta de carné solo si no está verificado
+        if (carnetCard) carnetCard.style.display = verificado ? "none" : "block";
 
         // Renderizar publicaciones propias
         const myBooks = this.books.filter(b => String(b.usuario_id) === String(user.id));
@@ -1585,11 +1645,13 @@ class CampusSwapApp {
         const user = api.getCurrentUser();
         const nameInput = document.getElementById("edit-prof-name");
         const carreraInput = document.getElementById("edit-prof-carrera");
+        const semInput = document.getElementById("edit-prof-semestre");
         const univInput = document.getElementById("edit-prof-univ");
         const telInput = document.getElementById("edit-prof-tel");
 
-        if (nameInput) nameInput.value = user.name;
+        if (nameInput) nameInput.value = user.name || "";
         if (carreraInput) carreraInput.value = user.carrera || "";
+        if (semInput) semInput.value = user.semestre || "";
         if (univInput) univInput.value = user.universidad || "";
         if (telInput) telInput.value = user.telefono || "";
 
@@ -1597,19 +1659,45 @@ class CampusSwapApp {
     }
 
     async submitEditProfile() {
-        const name = document.getElementById("edit-prof-name")?.value;
-        const carrera = document.getElementById("edit-prof-carrera")?.value;
-        const universidad = document.getElementById("edit-prof-univ")?.value;
-        const telefono = document.getElementById("edit-prof-tel")?.value;
+        const name = document.getElementById("edit-prof-name")?.value?.trim();
+        const carrera = document.getElementById("edit-prof-carrera")?.value?.trim();
+        const semestreRaw = document.getElementById("edit-prof-semestre")?.value;
+        const semestre = semestreRaw ? parseInt(semestreRaw, 10) : null;
+        const universidad = document.getElementById("edit-prof-univ")?.value?.trim();
+        const telefono = document.getElementById("edit-prof-tel")?.value?.trim();
 
         try {
-            await api.updateProfile({ name, carrera, universidad, telefono });
+            const updated = await api.updateProfile({ name, carrera, semestre, universidad, telefono });
             this.showToast("Perfil actualizado correctamente", "success");
             this.closeModal("edit-profile-modal");
             this.updateUserBadge();
-            this.renderProfile();
+            await this.renderProfile();
         } catch (e) {
             this.showToast(e.message || "Error al actualizar perfil", "error");
+        }
+    }
+
+    async submitUploadCarnet() {
+        const fileInput = document.getElementById("carnet-file-input");
+        const btn = document.getElementById("btn-upload-carnet");
+        const statusEl = document.getElementById("prof-carnet-status");
+        if (!fileInput?.files?.length) {
+            this.showToast("Selecciona una imagen de tu carné", "warning");
+            return;
+        }
+        const formData = new FormData();
+        formData.append("carnet", fileInput.files[0]);
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...'; }
+        try {
+            const res = await api.uploadCarnet(formData);
+            if (statusEl) statusEl.innerHTML = `<span style="color:var(--success);"><i class="fa-solid fa-check-circle"></i> ${res.msg || 'Carné enviado. Pendiente de revisión.'}</span>`;
+            this.showToast("Carné enviado correctamente. Un moderador lo revisará pronto.", "success");
+            fileInput.value = "";
+        } catch (e) {
+            this.showToast(e.message || "Error al subir el carné", "error");
+            if (statusEl) statusEl.innerHTML = `<span style="color:var(--danger);">${e.message || 'Error al subir el archivo'}</span>`;
+        } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Enviar Carné a Revisión'; }
         }
     }
 
@@ -1680,6 +1768,10 @@ class CampusSwapApp {
                 </div>
             `;
             }
+
+            // Cargar métricas y bitácora del Sistema Auditor 5W
+            await this.loadAuditStats();
+            await this.loadAuditLogs();
         }
 
         try {
@@ -1710,6 +1802,153 @@ class CampusSwapApp {
         } catch (e) {
             this.showToast(e.message || "No se pudo cargar la cola de verificación", "error");
         }
+    }
+
+    async loadAuditStats() {
+        try {
+            const stats = await api.getAuditStats();
+            const totalEl = document.getElementById("audit-kpi-total");
+            const exitososEl = document.getElementById("audit-kpi-exitosos");
+            const fallidosEl = document.getElementById("audit-kpi-fallidos");
+            const bloqueadosEl = document.getElementById("audit-kpi-bloqueados");
+            if (totalEl) totalEl.textContent = stats.total_eventos ?? 0;
+            if (exitososEl) exitososEl.textContent = stats.eventos_exitosos ?? 0;
+            if (fallidosEl) fallidosEl.textContent = stats.eventos_fallidos ?? 0;
+            if (bloqueadosEl) bloqueadosEl.textContent = stats.intentos_bloqueados_401_403 ?? 0;
+        } catch (e) {
+            console.warn("No se pudieron cargar estadísticas de auditoría", e);
+        }
+    }
+
+    async loadAuditLogs(reset = false) {
+        const tbody = document.getElementById("admin-audit-table-body");
+        if (!tbody) return;
+
+        try {
+            const search = document.getElementById("audit-filter-search")?.value?.trim() || "";
+            const action = document.getElementById("audit-filter-action")?.value || "";
+            const status = document.getElementById("audit-filter-status")?.value || "";
+
+            const params = { limit: 50 };
+            if (search) params.busqueda = search;
+            if (action) params.accion = action;
+            if (status === "solo_errores") params.solo_errores = true;
+
+            const res = await api.getAuditLogs(params);
+            this._auditLogsCache = res.items || [];
+
+            if (!this._auditLogsCache.length) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No se encontraron registros de auditoría.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = this._auditLogsCache.map(log => {
+                const fecha = new Date(log.fecha_hora).toLocaleString('es-CO', {
+                    dateStyle: 'short',
+                    timeStyle: 'medium',
+                    timeZone: 'UTC'
+                }) + ' UTC';
+
+                const statusColor = log.exito ? 'var(--success)' : '#ef4444';
+                const statusBg = log.exito ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)';
+                const userText = log.usuario_id 
+                    ? `Usuario #${log.usuario_id} <span style="font-size:0.75rem; color:var(--text-muted);">(${log.usuario_email || '-'})</span>` 
+                    : `<span style="color:var(--text-muted); font-style: italic;">Anónimo</span>`;
+
+                return `
+                    <tr>
+                        <td style="font-size: 0.8rem; font-family: monospace;">${fecha}</td>
+                        <td>
+                            <div>${userText}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;">IP: ${this.escapeHtml(log.ip_origen)}</div>
+                        </td>
+                        <td>
+                            <strong style="font-size: 0.85rem;">${this.escapeHtml(log.accion)}</strong>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">Recurso: ${this.escapeHtml(log.recurso || 'general')}</div>
+                        </td>
+                        <td>
+                            <span class="status-badge" style="font-size:0.7rem; font-weight:700;">${this.escapeHtml(log.metodo_http)}</span>
+                            <span style="font-size: 0.8rem; font-family: monospace;">${this.escapeHtml(log.endpoint)}</span>
+                        </td>
+                        <td>
+                            <span style="background: ${statusBg}; color: ${statusColor}; padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 700; font-size: 0.8rem;">
+                                HTTP ${log.estado_http}
+                            </span>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">${log.duracion_ms ?? 0} ms</div>
+                        </td>
+                        <td>
+                            <button class="btn btn-secondary btn-sm" onclick="app.showAuditDetail(${log.id})" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+                                <i class="fa-solid fa-eye"></i> 5W
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join("");
+        } catch (e) {
+            console.error("Error al cargar logs de auditoría:", e);
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #ef4444; padding: 1rem;">Error al consultar la bitácora: ${this.escapeHtml(e.message || "Error")}</td></tr>`;
+        }
+    }
+
+    async filterAuditLogs() {
+        await this.loadAuditLogs();
+    }
+
+    showAuditDetail(logId) {
+        const log = (this._auditLogsCache || []).find(l => l.id === logId);
+        if (!log) return;
+
+        const body = document.getElementById("audit-modal-body");
+        if (!body) return;
+
+        const fecha = new Date(log.fecha_hora).toISOString();
+        body.innerHTML = `
+            <div style="display: grid; gap: 1rem;">
+                <div style="background: var(--bg-tertiary); padding: 0.75rem 1rem; border-radius: var(--radius-md); border-left: 4px solid var(--primary);">
+                    <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-secondary); font-weight: 700;">Regla 5W: Clasificación de Evento</div>
+                    <div style="font-size: 1.1rem; font-weight: 800; margin-top: 0.25rem;">${this.escapeHtml(log.accion)}</div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                    <div style="background: var(--bg-secondary); padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                        <strong style="color: var(--primary);"><i class="fa-solid fa-user"></i> WHO (Quién):</strong>
+                        <div style="font-size: 0.85rem; margin-top: 0.25rem;">
+                            <strong>ID:</strong> ${log.usuario_id || 'Anónimo'}<br>
+                            <strong>Email:</strong> ${this.escapeHtml(log.usuario_email || 'No autenticado')}<br>
+                            <strong>Rol:</strong> ${this.escapeHtml(log.usuario_rol || 'Público')}<br>
+                            <strong>IP Origen:</strong> <code>${this.escapeHtml(log.ip_origen)}</code><br>
+                            <strong>User-Agent:</strong> <span style="font-size: 0.75rem; color: var(--text-muted); word-break: break-all;">${this.escapeHtml(log.user_agent || '-')}</span>
+                        </div>
+                    </div>
+
+                    <div style="background: var(--bg-secondary); padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                        <strong style="color: var(--primary);"><i class="fa-solid fa-clock"></i> WHEN (Cuándo):</strong>
+                        <div style="font-size: 0.85rem; margin-top: 0.25rem;">
+                            <strong>Timestamp ISO:</strong> <code>${fecha}</code><br>
+                            <strong>Duración procesamiento:</strong> ${log.duracion_ms ?? 0} ms
+                        </div>
+                    </div>
+                </div>
+
+                <div style="background: var(--bg-secondary); padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                    <strong style="color: var(--primary);"><i class="fa-solid fa-location-dot"></i> WHERE (Dónde):</strong>
+                    <div style="font-size: 0.85rem; margin-top: 0.25rem;">
+                        <strong>Método:</strong> <code>${this.escapeHtml(log.metodo_http)}</code><br>
+                        <strong>Endpoint:</strong> <code>${this.escapeHtml(log.endpoint)}</code><br>
+                        <strong>Recurso:</strong> ${this.escapeHtml(log.recurso || 'general')}
+                    </div>
+                </div>
+
+                <div style="background: var(--bg-secondary); padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                    <strong style="color: var(--primary);"><i class="fa-solid fa-circle-question"></i> WHY (Por qué / Resultado):</strong>
+                    <div style="font-size: 0.85rem; margin-top: 0.25rem;">
+                        <strong>Estado HTTP:</strong> <span style="font-weight: 700; color: ${log.exito ? 'var(--success)' : '#ef4444'}">${log.estado_http} (${log.exito ? 'Éxito' : 'Error/Bloqueo'})</span><br>
+                        <strong>Detalle:</strong> ${this.escapeHtml(log.detalle || 'Sin observaciones adicionales')}
+                    </div>
+                </div>
+            </div>
+        `;
+        this.openModal("audit-detail-modal");
     }
 
     async viewVerificationPhotos(verificationId) {
@@ -1895,6 +2134,10 @@ class CampusSwapApp {
         const email = document.getElementById("reg-email")?.value?.trim();
         const pass = document.getElementById("reg-password")?.value;
         const telefono = document.getElementById("reg-tel")?.value?.trim();
+        const carrera = document.getElementById("reg-carrera")?.value?.trim();
+        const semestreRaw = document.getElementById("reg-semestre")?.value;
+        const semestre = semestreRaw ? parseInt(semestreRaw, 10) : null;
+        const universidad = document.getElementById("reg-univ")?.value?.trim();
 
         if (!name) {
             this.showToast("Por favor escribe tu nombre completo", "warning");
@@ -1910,15 +2153,17 @@ class CampusSwapApp {
         }
 
         try {
-            const result = await api.register({ name, email, password: pass, telefono });
+            const result = await api.register({ name, email, password: pass, telefono, carrera, semestre, universidad });
             this.updateUserBadge();
             this.showToast(`¡Cuenta creada con éxito! Bienvenido, ${result.user?.name || name}`, "success");
             this.closeModal("register-modal");
             this.closeModal("auth-modal");
-            ["reg-name", "reg-email", "reg-password", "reg-tel"].forEach(id => {
+            ["reg-name", "reg-email", "reg-password", "reg-tel", "reg-carrera", "reg-univ"].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.value = "";
             });
+            const semEl = document.getElementById("reg-semestre");
+            if (semEl) semEl.selectedIndex = 0;
             this.renderCurrentView();
         } catch (e) {
             this.showToast(e.message || "Error al registrar la cuenta", "error");

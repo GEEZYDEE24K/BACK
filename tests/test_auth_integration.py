@@ -88,7 +88,11 @@ async def test_google_oauth_flow():
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as async_client:
-        response = await async_client.get("/auth/google/callback", params={"code": "dummy_code"})
+        response = await async_client.get(
+            "/auth/google/callback",
+            params={"code": "dummy_code"},
+            headers={"Accept": "application/json"}
+        )
     assert response.status_code == 200
     data = response.json()
     assert data["role"] in ("user", "usuario")

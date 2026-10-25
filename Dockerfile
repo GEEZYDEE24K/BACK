@@ -8,7 +8,12 @@ WORKDIR /app
 
 # Copiar sólo los archivos de dependencias para aprovechar cache
 COPY backend_estudiantil/requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+
+# Instalar PyTorch y TorchVision versión CPU (~150 MB en lugar de ~2 GB con CUDA).
+# Al ejecutar después pip install -r requirements.txt, pip detecta que torch y
+# torchvision ya están instalados y no descarga la versión con CUDA de PyPI.
+RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu \
+ && pip install --no-cache-dir -r requirements.txt
 
 # Copiar el resto del código
 COPY . .

@@ -137,7 +137,10 @@ class ApiService {
             email: userData.email,
             name: userData.name,
             password: userData.password,
-            telefono: userData.telefono || ""
+            telefono: userData.telefono || "",
+            carrera: userData.carrera || "",
+            semestre: userData.semestre || null,
+            universidad: userData.universidad || ""
         };
         try {
             await this._fetch("/auth/register", {
@@ -222,10 +225,14 @@ class ApiService {
                 role: data.role || "usuario",
                 is_active: data.is_active !== false,
                 telefono: data.telefono || "",
-                carrera: data.carrera || "Estudiante",
-                universidad: data.universidad || "Comunidad SwapU",
-                verificado: true,
-                avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=ea580c&color=fff&size=150`,
+                carrera: data.carrera || "",
+                universidad: data.universidad || "",
+                semestre: data.semestre || null,
+                foto_url: data.foto_url || null,
+                verificado_comunidad: data.verificado_comunidad || false,
+                perfil_completo: data.perfil_completo || false,
+                verificado: data.verificado_comunidad || false,
+                avatar: data.foto_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=ea580c&color=fff&size=150`,
                 reputacion: { promedio: 5.0, total_calificaciones: 0 }
             };
         } catch (e) {
@@ -235,12 +242,28 @@ class ApiService {
 
     async updateProfile(updates) {
         try {
-            await this._fetch("/usuarios/me", {
+            const data = await this._fetch("/usuarios/me", {
                 method: "PUT",
                 body: JSON.stringify(updates)
             });
+            // Actualizar el objeto local con la respuesta del servidor si es válida
+            if (data && data.id) {
+                const fresh = {
+                    ...this.getCurrentUser(),
+                    name: data.name,
+                    carrera: data.carrera || updates.carrera,
+                    universidad: data.universidad || updates.universidad,
+                    telefono: data.telefono || updates.telefono,
+                    semestre: data.semestre || updates.semestre,
+                    perfil_completo: data.perfil_completo,
+                    verificado_comunidad: data.verificado_comunidad,
+                    verificado: data.verificado_comunidad,
+                };
+                this.setCurrentUser(fresh);
+                return fresh;
+            }
         } catch (e) {
-            // Fallback local
+            // Fallback local si el backend no está disponible
         }
         const current = this.getCurrentUser();
         const merged = { ...current, ...updates };
@@ -254,6 +277,22 @@ class ApiService {
             localStorage.setItem(this.storageKeyUsers, JSON.stringify(users));
         }
         return merged;
+    }
+
+    async uploadCarnet(formData) {
+        const token = this.getToken();
+        const headers = {};
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        const res = await fetch(`${this.baseUrl}/usuarios/me/solicitar-verificacion`, {
+            method: "POST",
+            headers,
+            body: formData
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ detail: res.statusText }));
+            throw new Error(err.detail || "Error al subir el carné");
+        }
+        return res.json();
     }
 
     async listUsers() {
@@ -520,6 +559,28 @@ class ApiService {
             body: JSON.stringify({ decision, nota: note })
         });
     }
+
+    // -------------------------------------------------------------------------
+    // SISTEMA AUDITOR (REGLA DE LAS 5W)
+    // -------------------------------------------------------------------------
+    async getAuditLogs(params = {}) {
+        const query = new URLSearchParams();
+        if (params.skip !== undefined) query.set("skip", params.skip);
+        if (params.limit !== undefined) query.set("limit", params.limit);
+        if (params.accion) query.set("accion", params.accion);
+        if (params.usuario_id) query.set("usuario_id", params.usuario_id);
+        if (params.solo_errores) query.set("solo_errores", "true");
+        if (params.recurso) query.set("recurso", params.recurso);
+        if (params.busqueda) query.set("busqueda", params.busqueda);
+
+        const qs = query.toString();
+        return await this._fetch(`/admin/auditoria${qs ? "?" + qs : ""}`);
+    }
+
+    async getAuditStats() {
+        return await this._fetch("/admin/auditoria/stats");
+    }
+
 
     // -------------------------------------------------------------------------
     // MATCHES Y PORCENTAJES

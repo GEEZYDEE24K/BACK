@@ -82,6 +82,13 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     await inicializar_categorias()
+    # Precalentar modelos de IA desde el lifespan
+    try:
+        import logging
+        from backend_estudiantil.infrastructure.verificacion_ia import precalentar
+        asyncio.create_task(asyncio.to_thread(precalentar))
+    except Exception as _e:
+        logging.getLogger(__name__).warning("No se pudo ejecutar precalentar IA: %s", _e)
     yield
     # Limpieza o cierre de conexiones si es necesario al apagar el servidor
 
@@ -101,6 +108,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Capa de Captura: Middleware de Auditoría bajo la Regla de las 5W
+from backend_estudiantil.infrastructure.audit_middleware import AuditMiddleware
+app.add_middleware(AuditMiddleware)
 
 # Manejador de error para Rate Limit
 @app.exception_handler(RateLimitExceeded)
@@ -122,6 +133,17 @@ app.include_router(trueques_router)
 app.include_router(calificaciones_router)
 app.include_router(chat_router)
 app.include_router(verificaciones_router)
+
+# Compatibilidad con FastAPI 0.140+ / Starlette 1.7+ (_IncludedRouter sin atributo 'path')
+try:
+    import prometheus_fastapi_instrumentator.routing as pfi_routing
+    _orig_get_route_name = pfi_routing._get_route_name
+    def _safe_get_route_name(scope, routes, route_name=None):
+        safe_routes = [r for r in routes if hasattr(r, "path")]
+        return _orig_get_route_name(scope, safe_routes, route_name)
+    pfi_routing._get_route_name = _safe_get_route_name
+except Exception:
+    pass
 
 # Instrumentación de métricas con Prometheus
 Instrumentator().instrument(app).expose(app)

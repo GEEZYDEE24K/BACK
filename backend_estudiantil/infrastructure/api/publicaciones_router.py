@@ -68,6 +68,9 @@ async def obtener_publicacion(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
+from backend_estudiantil.adapters.db.sqlalchemy_user_repository import SQLAlchemyUserRepository
+
+
 @router.post("/", response_model=PublicacionRead, status_code=status.HTTP_201_CREATED, summary="Crear publicación")
 async def crear_publicacion(
     payload: PublicacionCreate,
@@ -75,6 +78,16 @@ async def crear_publicacion(
     service: PublicacionService = Depends(get_publicacion_service),
 ):
     """Crea una nueva publicación de libro o material académico para intercambio."""
+    user = await SQLAlchemyUserRepository().get_by_id(current_user["id"])
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
+
+    if getattr(user, "estado_cuenta", "activo") == "bloqueado":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tu cuenta se encuentra bloqueada. Contacta al soporte para más información.",
+        )
+
     try:
         pub = await service.crear_publicacion(
             usuario_id=current_user["id"],

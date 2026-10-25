@@ -102,13 +102,14 @@ def _clasificar_imagen(imagen_bytes: bytes) -> tuple[bool, float, str]:
     """
     Clasifica la imagen y retorna (es_libro, confianza, nombre_clase).
     Usa MobileNetV3-Large con ImageNet weights.
+    Si el modelo no carga o falla, falla cerrado retornando False (pendiente revisión humana).
     """
-    modelo, transform, clases, torch = _cargar_modelo()
-    if modelo is None:
-        logger.warning("Modelo no disponible - omitiendo clasificacion")
-        return True, 0.5, "modelo_no_disponible"
-
     try:
+        modelo, transform, clases, torch = _cargar_modelo()
+        if modelo is None:
+            logger.warning("Modelo no disponible - fallando cerrado para revisión manual")
+            return False, 0.0, "modelo_no_disponible"
+
         from PIL import Image
         imagen = Image.open(io.BytesIO(imagen_bytes)).convert("RGB")
         tensor = transform(imagen).unsqueeze(0)
@@ -135,7 +136,7 @@ def _clasificar_imagen(imagen_bytes: bytes) -> tuple[bool, float, str]:
 
     except Exception as exc:
         logger.error("Error en clasificacion: %s", exc)
-        return True, 0.4, "error_clasificacion"
+        return False, 0.0, "error_clasificacion"
 
 
 def _extraer_texto_ocr(imagen_bytes: bytes) -> list[str]:
@@ -230,10 +231,13 @@ def _codigo_presente(codigo: str, textos: list[str]) -> bool:
 
 
 
+from typing import Optional
+
+
 def verificar_imagen(
     imagen_bytes: bytes,
     codigo_desafio: str,
-    umbral_libro: float = 0.10,
+    umbral_libro: Optional[float] = None,
 ) -> dict:
     """
     Punto de entrada principal del módulo de IA.
@@ -241,7 +245,7 @@ def verificar_imagen(
     Parámetros:
         imagen_bytes   : bytes de la imagen (JPEG/PNG/WebP)
         codigo_desafio : código aleatorio de 8 chars que debe aparecer en la foto
-        umbral_libro   : confianza mínima para considerar que es un libro (0-1)
+        umbral_libro   : confianza mínima para considerar que es un libro (0-1), si None se toma de settings
 
     Retorna dict con:
         es_libro         : bool
@@ -252,7 +256,14 @@ def verificar_imagen(
         aprobado         : bool
         detalle          : str
     """
-    logger.info("Iniciando verificacion IA para codigo: %s", codigo_desafio)
+    if umbral_libro is None:
+        try:
+            from backend_estudiantil.config.settings import settings
+            umbral_libro = getattr(settings, "IA_UMBRAL_LIBRO", 0.10)
+        except Exception:
+            umbral_libro = 0.10
+
+    logger.info("Iniciando verificacion IA para codigo: %s (umbral: %.2f)", codigo_desafio, umbral_libro)
 
     # Paso 1: ¿Es un libro?
     es_libro, confianza, clase = _clasificar_imagen(imagen_bytes)
@@ -268,9 +279,11 @@ def verificar_imagen(
         for excl in ["laptop", "screen", "monitor", "television", "remote"]
     )
 
+    es_valido_como_libro = es_libro or (confianza >= umbral_libro and clase not in ("modelo_no_disponible", "error_clasificacion"))
+
     aprobado = (
         not es_pantalla
-        and (es_libro or confianza >= umbral_libro)
+        and es_valido_como_libro
         and codigo_encontrado
     )
 

@@ -57,6 +57,9 @@ async def obtener_trueque(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
+from backend_estudiantil.adapters.db.sqlalchemy_user_repository import SQLAlchemyUserRepository
+
+
 @router.post("/", response_model=TruequeRead, status_code=status.HTTP_201_CREATED, summary="Proponer trueque")
 @router.post(
     "/proponer",
@@ -70,6 +73,16 @@ async def proponer_trueque(
     service: TruequeService = Depends(get_trueque_service),
 ):
     """Propone un nuevo trueque a otro usuario."""
+    user = await SQLAlchemyUserRepository().get_by_id(current_user["id"])
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
+
+    if getattr(user, "estado_cuenta", "activo") == "bloqueado":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tu cuenta se encuentra bloqueada. Contacta al soporte para más información.",
+        )
+
     try:
         trueque = await service.proponer_trueque(
             usuario_propone_id=current_user["id"],

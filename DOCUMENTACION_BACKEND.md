@@ -167,7 +167,10 @@ El Refresh Token se almacena en una cookie del navegador con directivas de alta 
 | `PUT` | `/usuarios/{user_id}` | Admin o Propietario | Actualización administrativa de información de un usuario. |
 | `DELETE` | `/usuarios/{user_id}` | Solo Admin (403) | Eliminación de un usuario del sistema (código 204 No Content). |
 | `POST` | `/admin/users/{id}/promote` | Solo Admin (403) | Promueve a un usuario al rol privilegiado de 'moderador'. |
+| `GET` | `/admin/auditoria` | Solo Admin (403) | Consulta paginada y filtrada de logs de seguridad bajo la Regla 5W. |
+| `GET` | `/admin/auditoria/stats` | Solo Admin (403) | Métricas y KPIs consolidados de eventos exitosos, fallidos y bloqueados. |
 | `POST` | `/publicaciones/` | Estudiante (Token) | Registra un libro oculto hasta demostrar posesión y recibir aprobación de moderación. |
+
 | `GET` | `/publicaciones/mis-publicaciones` | Estudiante (Token) | Lista los libros activos e inactivos del usuario autenticado. |
 | `POST` | `/publicaciones/{id}/verificacion/desafios` | Propietario (Token) | Genera un código temporal para las fotos de portada y página ISBN. |
 | `POST` | `/publicaciones/{id}/verificacion/evidencias` | Propietario (Token) | Sube fotos privadas con código visible; límite 8 MB por foto. |
@@ -223,12 +226,57 @@ tests/test_auth_integration.py::test_google_oauth_flow PASSED            [100%]
 
 1. El estudiante autenticado registra un libro con `POST /publicaciones/`. La publicación queda inactiva y oculta mientras se verifica.
 2. Solicita `POST /publicaciones/{id}/verificacion/desafios` y toma dos fotos recientes mostrando el código temporal en la portada y en la página del ISBN. El desafío vence en 15 minutos.
-3. Envía ambas fotos con `POST /publicaciones/{id}/verificacion/evidencias`. Un administrador o moderador abre la cola de revisión del panel, inspecciona las fotos privadas y aprueba o rechaza; sólo una aprobación vuelve activa la publicación.
+3. Envía ambas fotos con `POST /publicaciones/{id}/verificacion/evidencias`. El sistema ejecuta automáticamente la verificación con IA (red neuronal + OCR); si ambas capas aprueban, la publicación se activa de inmediato. Si la IA no aprueba o no está disponible, la evidencia queda en cola para revisión humana por un moderador o administrador.
 4. En el catálogo, el estudiante selecciona una publicación propia activa y otra publicación activa, y envía `POST /trueques/` con `publicacion_origen_id` y `publicacion_destino_id`.
 5. Los dos participantes consultan el historial paginado y se envían mensajes con `GET/POST /trueques/{id}/mensajes`. Redis distribuye los nuevos eventos mediante `WS /trueques/{id}/ws`, autenticado con el token como subprotocolo `bearer`.
 6. El receptor puede confirmar; cualquiera de los participantes puede completar. Rechazar o completar archiva la conversación y bloquea nuevos mensajes.
 
-No se aceptan mensajes ni conexiones WebSocket de usuarios ajenos al trueque. Las fotos de verificación no son públicas, se normalizan para retirar metadatos y la revisión inicial es humana. El código ayuda a evitar fotos recicladas, pero no demuestra por sí solo que un libro sea genuino. No se usa biometría ni se activa un modelo neuronal sin datos etiquetados revisados.
+No se aceptan mensajes ni conexiones WebSocket de usuarios ajenos al trueque. Las fotos de verificación no son públicas y se normalizan para retirar metadatos EXIF. El código de desafío ayuda a evitar fotos recicladas, pero no demuestra por sí solo que un libro sea genuino. No se usa biometría.
+
+### 7.1. Verificación con IA (MobileNetV3 + EasyOCR)
+
+Al enviar la evidencia fotográfica, el sistema ejecuta automáticamente un pipeline de IA de doble capa antes de derivar a revisión humana:
+
+**Capa 1 — Clasificación de imagen (Red Neuronal Convolucional):**
+- Modelo: **MobileNetV3-Large** pre-entrenado en **ImageNet** (1.000 clases, solo inferencia — no se entrena con datos propios).
+- Se analiza la foto de portada y se obtienen las Top-5 predicciones con `softmax`.
+- Se busca si alguna predicción pertenece a categorías de libro/papel (`book`, `comic book`, `magazine`, `notebook`, etc.) o contiene palabras clave (`book`, `text`, `page`, `paper`, `cover`).
+- Se descartan imágenes clasificadas como pantalla (`laptop`, `screen`, `monitor`, `television`, `remote`).
+- **Umbral de confianza**: `umbral_libro = 0.10` (10%). Si la confianza supera este umbral aunque la clase no sea de libro, se considera aceptable.
+
+**Capa 2 — OCR con código de desafío:**
+- Motor: **EasyOCR** con soporte para español e inglés, ejecutado en CPU (`gpu=False`).
+- Extrae todo el texto visible de la imagen y lo normaliza a mayúsculas.
+- Busca el código de desafío de **8 caracteres hexadecimales** generado con `secrets.token_hex(4)`.
+- Tolerancia a errores de OCR:
+  - Coincidencia exacta en el texto concatenado.
+  - Normalización de confusiones visuales típicas (O→0, I→1, L→1, S→5, B→8, etc.).
+  - Similitud difusa con `difflib.SequenceMatcher`: umbral **≥ 0.65** por fragmento y **≥ 0.70** en ventana deslizante.
+  - Búsqueda de mitades del código si tiene 6+ caracteres.
+
+**Regla de decisión:**
+```
+aprobado = (no es pantalla) AND (es_libro OR confianza >= 0.10) AND (código encontrado por OCR)
+```
+
+- **Si `aprobado = True`**: la verificación pasa a estado `"aprobada"` y la publicación se activa automáticamente en el catálogo.
+- **Si `aprobado = False`**: la verificación queda en `"pendiente_revision"` para que un moderador o administrador decida manualmente.
+
+**Comportamiento cuando las librerías de IA no están instaladas:**
+
+El `try/except` del router (`verificaciones_router.py`, líneas 37-43) solo cubre fallos al importar el **módulo** `verificacion_ia.py` en sí (por ejemplo, un error de sintaxis). Las librerías `torch`, `torchvision` y `easyocr` se importan de forma **diferida** dentro de las funciones `_cargar_modelo()` y `_cargar_ocr()`, cada una con su propio `try/except`. Por tanto, si PyTorch o EasyOCR no están instalados:
+
+1. `_cargar_modelo()` captura el `ImportError`, registra un warning y retorna `(None, None, None, None)`.
+2. `_clasificar_imagen()` detecta que el modelo es `None` y retorna `(True, 0.5, "modelo_no_disponible")` — asume optimistamente que es un libro.
+3. `_cargar_ocr()` captura el error y retorna `None`.
+4. `_extraer_texto_ocr()` detecta que el lector es `None` y retorna una lista vacía `[]`.
+5. `_codigo_presente()` recibe una lista vacía → retorna `False` (código no encontrado).
+6. `verificar_imagen()` evalúa la regla: `aprobado = True AND True AND False` → **`False`**.
+7. En el router, `ia_aprobado = False` → la verificación queda en `"pendiente_revision"`.
+
+El módulo importa correctamente (flag `_IA_DISPONIBLE = True`) y la IA se "ejecuta", pero siempre rechaza por no poder leer el código. Esto deriva toda verificación a revisión humana de forma transparente.
+
+> **Primera ejecución:** los pesos de MobileNetV3-Large (~20 MB) y los modelos de idioma de EasyOCR se descargan automáticamente la primera vez que se procesa una verificación. Se requiere conexión a internet en esa primera ejecución; las descargas posteriores se sirven de la caché local.
 
 ---
 
