@@ -47,6 +47,10 @@ async def register(payload: UserCreate, service: UserService = Depends(get_user_
             telefono=user.telefono,
             carrera=user.programa_area,
             universidad=user.universidad,
+            semestre=user.semestre,
+            foto_url=user.foto_url,
+            perfil_completo=user.perfil_completo,
+            verificado_comunidad=user.verificado_comunidad,
             created_at=user.fecha_registro.isoformat() if hasattr(user.fecha_registro, "isoformat") else str(user.fecha_registro),
             updated_at=user.fecha_registro.isoformat() if hasattr(user.fecha_registro, "isoformat") else str(user.fecha_registro),
         )
@@ -89,7 +93,7 @@ async def login(
     return Token(
         access_token=access_token,
         token_type="bearer",
-        role=user.role,
+        role=user.rol,
         expires_in=float(timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES).total_seconds()),
     )
 
@@ -136,20 +140,23 @@ async def social_login(
     repo = service.repo
     user = await repo.get_by_email(payload.email)
     if not user:
+        es_inst = settings.es_dominio_institucional(payload.email)
+        universidad = settings.obtener_universidad_por_dominio(payload.email) if es_inst else (payload.universidad or "Universidad")
         user = User(
             correo_institucional=payload.email,
             password_hash="",  # Sin contraseña local requerida para auth federada
             name=payload.name or payload.email.split("@")[0],
             rol="usuario",
             estado_cuenta="activo",
-            verificado_comunidad=True,
+            verificado_comunidad=es_inst,
             telefono=payload.telefono or "",
             programa_area=payload.carrera or "Estudiante Universitario",
-            universidad=payload.universidad or "Universidad",
+            universidad=universidad,
+            perfil_completo=bool(payload.name and universidad and payload.carrera),
         )
         user = await repo.create(user)
     else:
-        if payload.name and (not user.nombre or user.nombre == "Estudiante"):
+        if payload.name and (not user.name or user.name == "Estudiante"):
             user.name = payload.name
             await repo.update(user)
 

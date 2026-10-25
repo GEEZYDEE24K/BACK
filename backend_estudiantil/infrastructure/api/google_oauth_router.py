@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
-from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
 import json
 
 from backend_estudiantil.adapters.db.sqlalchemy_user_repository import SQLAlchemyUserRepository
@@ -30,6 +30,7 @@ async def google_login(authenticator: GoogleOAuth2Authenticator = Depends(get_go
 @router.get("/callback")
 async def google_callback(
     code: str,
+    request: Request,
     response: Response,
     repo: UserRepository = Depends(get_user_repository),
     jwt_auth: JWTAuthenticator = Depends(get_jwt_authenticator),
@@ -50,13 +51,17 @@ async def google_callback(
     # Si no existe, crear al usuario automáticamente
     user = await repo.get_by_email(email)
     if not user:
+        es_inst = settings.es_dominio_institucional(email)
+        uni = settings.obtener_universidad_por_dominio(email)
         user = User(
             correo_institucional=email,
             password_hash="",  # Sin contraseña para usuarios federados con Google
             name=name,
             rol="usuario",
             estado_cuenta="activo",
-            verificado_comunidad=True,
+            verificado_comunidad=es_inst,
+            universidad=uni,
+            perfil_completo=bool(name and uni),
         )
         await repo.create(user)
 
@@ -66,8 +71,52 @@ async def google_callback(
     access_jwt = jwt_auth.create_access_token(payload)
     refresh_jwt = jwt_auth.create_refresh_token(payload)
 
-    # Setear cookie segura de refresh token
-    response.set_cookie(
+    user_data = {
+        "id": str(user.id),
+        "email": user.correo_institucional,
+        "name": user.name,
+        "role": user.rol,
+        "is_active": True,
+        "carrera": user.programa_area or "",
+        "universidad": user.universidad or "",
+        "telefono": user.telefono or "",
+        "semestre": getattr(user, "semestre", None),
+        "verificado_comunidad": getattr(user, "verificado_comunidad", False),
+        "verificado": getattr(user, "verificado_comunidad", False),
+        "perfil_completo": getattr(user, "perfil_completo", False),
+        "avatar": user.foto_url or f"https://ui-avatars.com/api/?name={name.replace(' ', '+') if name else 'U'}&background=ea4335&color=fff&size=150"
+    }
+
+    if "application/json" in request.headers.get("accept", ""):
+        res = JSONResponse(
+            content={
+                "access_token": access_jwt,
+                "role": user.rol,
+                "user": user_data,
+            }
+        )
+    else:
+        # Render HTML for popup
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head><title>Autenticación Exitosa</title></head>
+        <body>
+        <script>
+            window.opener.postMessage({{
+                type: "OAUTH_SUCCESS",
+                provider: "google",
+                token: "{access_jwt}",
+                user: {json.dumps(user_data)}
+            }}, "*");
+            window.close();
+        </script>
+        </body>
+        </html>
+        """
+        res = HTMLResponse(content=html_content)
+
+    res.set_cookie(
         key="refresh_token",
         value=refresh_jwt,
         httponly=settings.COOKIE_HTTPONLY,
@@ -75,32 +124,4 @@ async def google_callback(
         samesite=settings.COOKIE_SAMESITE,
         max_age=60 * 60 * 24 * settings.REFRESH_TOKEN_EXPIRE_DAYS,
     )
-    
-    user_data = {
-        "id": str(user.id),
-        "email": user.correo_institucional,
-        "name": user.name,
-        "role": user.rol,
-        "is_active": True,
-        "avatar": f"https://ui-avatars.com/api/?name={name.replace(' ', '+') if name else 'U'}&background=ea4335&color=fff&size=150"
-    }
-
-    # Render HTML for popup
-    html_content = f"""
-    <!DOCTYPE html>
-    <html>
-    <head><title>Autenticación Exitosa</title></head>
-    <body>
-    <script>
-        window.opener.postMessage({{
-            type: "OAUTH_SUCCESS",
-            provider: "google",
-            token: "{access_jwt}",
-            user: {json.dumps(user_data)}
-        }}, "*");
-        window.close();
-    </script>
-    </body>
-    </html>
-    """
-    return HTMLResponse(content=html_content)
+    return res

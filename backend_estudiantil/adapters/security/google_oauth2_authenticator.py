@@ -57,7 +57,12 @@ class GoogleOAuth2Authenticator:
         async with httpx.AsyncClient() as client:
             resp = await client.post(token_url, data=data, headers={"Accept": "application/json"})
         if resp.status_code != 200:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to exchange code for token")
+            import logging
+            logging.error(f"Google token exchange failed ({resp.status_code}): {resp.text}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to exchange code for token: {resp.text}"
+            )
         return resp.json()
 
     async def get_userinfo(self, access_token: str) -> dict:

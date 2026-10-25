@@ -7,6 +7,8 @@ class UserBase(BaseModel):
     telefono: Optional[str] = Field(None, description="Número de teléfono o WhatsApp de contacto")
     carrera: Optional[str] = Field(None, description="Carrera o programa académico")
     universidad: Optional[str] = Field(None, description="Universidad o campus del estudiante")
+    semestre: Optional[int] = Field(None, description="Semestre académico actual")
+    foto_url: Optional[str] = Field(None, description="URL pública del avatar o foto de perfil")
 
 class UserCreate(UserBase):
     password: str = Field(..., min_length=6, description="Contraseña de acceso (mínimo 6 caracteres)")
@@ -19,11 +21,16 @@ class UserUpdate(BaseModel):
     telefono: Optional[str] = None
     carrera: Optional[str] = None
     universidad: Optional[str] = None
+    semestre: Optional[int] = None
+    foto_url: Optional[str] = None
+    perfil_completo: Optional[bool] = None
 
 class UserRead(UserBase):
     id: str
     role: str = Field(default="user", description="Rol asignado al usuario")
     is_active: bool = Field(default=True, description="Estado de la cuenta")
+    verificado_comunidad: bool = Field(default=False, description="Verificación institucional del estudiante")
+    perfil_completo: bool = Field(default=False, description="Indica si el usuario completó su información de perfil")
     created_at: str = Field(..., description="Fecha de creación ISO 8601")
     updated_at: str = Field(..., description="Fecha de última actualización ISO 8601")
 

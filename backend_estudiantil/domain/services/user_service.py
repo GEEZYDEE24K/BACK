@@ -1,5 +1,6 @@
 from typing import List, Optional
 
+from backend_estudiantil.config.settings import settings
 from backend_estudiantil.domain.models.user import User
 from backend_estudiantil.adapters.security.password_hasher import hash_password, verify_password
 from backend_estudiantil.ports.repositories.user_repository import UserRepository
@@ -27,15 +28,26 @@ class UserService:
 
         hashed = self._hash_password(payload.password)
 
+        # Regla 1: Verificación de comunidad automática si el correo es institucional
+        es_inst = settings.es_dominio_institucional(payload.email)
+        universidad = settings.obtener_universidad_por_dominio(payload.email) if es_inst else getattr(payload, "universidad", None)
+        carrera = getattr(payload, "carrera", None)
+        nombre = payload.name or ""
+        perfil_completo = bool(nombre.strip() and universidad and carrera)
+
         user = User(
             correo_institucional=payload.email,
             password_hash=hashed,
             name=payload.name,
             rol="administrador" if (payload.role or "").lower() in ("admin", "administrador") else "usuario",
             estado_cuenta="activo",
-            verificado_comunidad=True,
-            programa_area=getattr(payload, "carrera", None),
-            universidad=getattr(payload, "universidad", None),
+            verificado_comunidad=es_inst,
+            programa_area=carrera,
+            universidad=universidad,
+            telefono=getattr(payload, "telefono", None),
+            semestre=getattr(payload, "semestre", None),
+            foto_url=getattr(payload, "foto_url", None),
+            perfil_completo=perfil_completo,
         )
         return await self.repo.create(user)
 
@@ -58,6 +70,10 @@ class UserService:
             if existing and existing.id != user.id:
                 raise ValueError("El correo electrónico ya está en uso")
             user.correo_institucional = payload.email
+            if settings.es_dominio_institucional(payload.email):
+                user.verificado_comunidad = True
+                if not user.universidad:
+                    user.universidad = settings.obtener_universidad_por_dominio(payload.email)
 
         if payload.name is not None:
             user.name = payload.name
@@ -67,6 +83,23 @@ class UserService:
 
         if getattr(payload, "universidad", None) is not None:
             user.universidad = payload.universidad
+
+        if getattr(payload, "telefono", None) is not None:
+            user.telefono = payload.telefono
+
+        if getattr(payload, "semestre", None) is not None:
+            user.semestre = payload.semestre
+
+        if getattr(payload, "foto_url", None) is not None:
+            user.foto_url = payload.foto_url
+
+        if getattr(payload, "perfil_completo", None) is not None:
+            user.perfil_completo = payload.perfil_completo
+        else:
+            # Autocalcular perfil_completo si cuenta con datos clave
+            user.perfil_completo = bool(
+                user.name and user.name.strip() and user.universidad and user.programa_area
+            )
 
         if payload.password:
             user.password_hash = self._hash_password(payload.password)

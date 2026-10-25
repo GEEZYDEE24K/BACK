@@ -25,9 +25,15 @@ class SQLAlchemyUserRepository(UserRepository):
             tipo_usuario=getattr(orm, "tipo_usuario", "estudiante"),
             programa_area=getattr(orm, "programa_area", None),
             rol=getattr(orm, "rol", "usuario"),
-            verificado_comunidad=getattr(orm, "verificado_comunidad", True),
+            verificado_comunidad=getattr(orm, "verificado_comunidad", False),
             estado_cuenta=getattr(orm, "estado_cuenta", "activo"),
             fecha_registro=orm.fecha_registro,
+            telefono=getattr(orm, "telefono", None),
+            universidad=getattr(orm, "universidad", None),
+            semestre=getattr(orm, "semestre", None),
+            foto_url=getattr(orm, "foto_url", None),
+            carnet_path=getattr(orm, "carnet_path", None),
+            perfil_completo=getattr(orm, "perfil_completo", False),
         )
 
     async def get_by_id(self, user_id) -> Optional[User]:
@@ -58,6 +64,12 @@ class SQLAlchemyUserRepository(UserRepository):
                 rol=user.rol or "usuario",
                 verificado_comunidad=user.verificado_comunidad,
                 estado_cuenta=user.estado_cuenta or "activo",
+                telefono=user.telefono,
+                universidad=user.universidad,
+                semestre=user.semestre,
+                foto_url=user.foto_url,
+                carnet_path=user.carnet_path,
+                perfil_completo=user.perfil_completo,
             )
             session.add(orm)
             await session.commit()
@@ -78,6 +90,13 @@ class SQLAlchemyUserRepository(UserRepository):
             orm.rol = user.rol
             orm.estado_cuenta = user.estado_cuenta
             orm.programa_area = user.programa_area
+            orm.verificado_comunidad = user.verificado_comunidad
+            orm.telefono = user.telefono
+            orm.universidad = user.universidad
+            orm.semestre = user.semestre
+            orm.foto_url = user.foto_url
+            orm.carnet_path = user.carnet_path
+            orm.perfil_completo = user.perfil_completo
             await session.commit()
             await session.refresh(orm)
             return await self._to_entity(orm)

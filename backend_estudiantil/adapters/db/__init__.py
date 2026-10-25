@@ -71,9 +71,16 @@ class UserORM(Base):
     tipo_usuario = sa.Column(tipo_usuario_enum, default="estudiante", nullable=False)
     programa_area = sa.Column(sa.String, nullable=True)
     rol = sa.Column(rol_enum, default="usuario", nullable=False)
-    verificado_comunidad = sa.Column(sa.Boolean, default=True, nullable=False)
+    verificado_comunidad = sa.Column(sa.Boolean, default=False, nullable=False)
     estado_cuenta = sa.Column(estado_cuenta_enum, default="activo", nullable=False)
     fecha_registro = sa.Column(sa.DateTime, default=sa.func.now(), nullable=False)
+    # Campos de perfil extendido
+    telefono = sa.Column(sa.String(30), nullable=True)
+    universidad = sa.Column(sa.String(150), nullable=True)
+    semestre = sa.Column(sa.Integer, nullable=True)
+    foto_url = sa.Column(sa.String(512), nullable=True)
+    carnet_path = sa.Column(sa.String(512), nullable=True)
+    perfil_completo = sa.Column(sa.Boolean, default=False, nullable=False)
 
     # Relaciones
     publicaciones = relationship("PublicacionORM", back_populates="usuario", cascade="all, delete-orphan", foreign_keys="PublicacionORM.usuario_id")
@@ -206,3 +213,43 @@ class MensajeORM(Base):
 
     trueque = relationship("TruequeORM")
     remitente = relationship("UserORM", foreign_keys=[remitente_id])
+
+
+class AuditoriaLogORM(Base):
+    """Tabla 'auditorias' para trazabilidad y seguridad bajo la regla de las 5W.
+    
+    Regla de las 5W:
+      - Who (Quién): usuario_id, usuario_email, usuario_rol, ip_origen, user_agent
+      - What (Qué): accion, recurso
+      - When (Cuándo): fecha_hora (UTC)
+      - Where (Dónde): metodo_http, endpoint
+      - Why (Por qué): estado_http, exito, detalle, duracion_ms
+    """
+    __tablename__ = "auditorias"
+    __table_args__ = (
+        sa.Index("ix_auditorias_fecha_hora", "fecha_hora"),
+        sa.Index("ix_auditorias_usuario_id", "usuario_id"),
+        sa.Index("ix_auditorias_accion", "accion"),
+        sa.Index("ix_auditorias_estado_http", "estado_http"),
+    )
+
+    id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    # Who (Quién)
+    usuario_id = sa.Column(sa.Integer, nullable=True)
+    usuario_email = sa.Column(sa.String(150), nullable=True)
+    usuario_rol = sa.Column(sa.String(50), nullable=True)
+    ip_origen = sa.Column(sa.String(64), nullable=False, default="127.0.0.1")
+    user_agent = sa.Column(sa.String(256), nullable=True)
+    # What (Qué)
+    accion = sa.Column(sa.String(100), nullable=False)
+    recurso = sa.Column(sa.String(100), nullable=True)
+    # When (Cuándo)
+    fecha_hora = sa.Column(sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False)
+    # Where (Dónde)
+    metodo_http = sa.Column(sa.String(10), nullable=False)
+    endpoint = sa.Column(sa.String(255), nullable=False)
+    # Why (Por qué)
+    estado_http = sa.Column(sa.Integer, nullable=False)
+    exito = sa.Column(sa.Boolean, default=True, nullable=False)
+    detalle = sa.Column(sa.Text, nullable=True)
+    duracion_ms = sa.Column(sa.Float, nullable=True)

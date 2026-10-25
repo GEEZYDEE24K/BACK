@@ -14,9 +14,16 @@ class User:
         tipo_usuario: str = "estudiante",
         programa_area: Optional[str] = None,
         rol: str = "usuario",
-        verificado_comunidad: bool = True,
+        verificado_comunidad: bool = False,
         estado_cuenta: str = "activo",
         fecha_registro: Optional[datetime] = None,
+        # Campos de perfil de usuario
+        telefono: Optional[str] = None,
+        universidad: Optional[str] = None,
+        semestre: Optional[int] = None,
+        foto_url: Optional[str] = None,
+        carnet_path: Optional[str] = None,
+        perfil_completo: bool = False,
         # Argumentos compatibles con llamadas anteriores
         email: Optional[str] = None,
         hashed_password: Optional[str] = None,
@@ -24,8 +31,6 @@ class User:
         role: Optional[str] = None,
         is_active: Optional[bool] = None,
         carrera: Optional[str] = None,
-        telefono: Optional[str] = None,
-        universidad: Optional[str] = None,
         created_at: Optional[datetime] = None,
         updated_at: Optional[datetime] = None,
     ) -> None:
@@ -50,6 +55,10 @@ class User:
         self.fecha_registro = fecha_registro or created_at or datetime.now(timezone.utc)
         self.telefono = telefono
         self.universidad = universidad
+        self.semestre = semestre
+        self.foto_url = foto_url
+        self.carnet_path = carnet_path
+        self.perfil_completo = perfil_completo
 
     # Propiedades de compatibilidad
     @property

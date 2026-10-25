@@ -48,13 +48,17 @@ async def facebook_callback(
 
     user = await repo.get_by_email(email)
     if not user:
+        es_inst = settings.es_dominio_institucional(email)
+        uni = settings.obtener_universidad_por_dominio(email)
         user = User(
             correo_institucional=email,
             password_hash="",
             name=name,
             rol="usuario",
             estado_cuenta="activo",
-            verificado_comunidad=True,
+            verificado_comunidad=es_inst,
+            universidad=uni,
+            perfil_completo=bool(name and uni),
         )
         await repo.create(user)
 

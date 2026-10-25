@@ -59,6 +59,49 @@ class Settings(BaseSettings):
     FACEBOOK_SCOPES: str = Field(default="email,public_profile", validation_alias="FACEBOOK_SCOPES")
 
 
+    # Verificación de comunidad y dominios institucionales
+    DOMINIOS_INSTITUCIONALES: dict[str, str] = Field(
+        default={
+            "unal.edu.co": "Universidad Nacional de Colombia",
+            "udea.edu.co": "Universidad de Antioquia",
+            "uniandes.edu.co": "Universidad de los Andes",
+            "javeriana.edu.co": "Pontificia Universidad Javeriana",
+            "univalle.edu.co": "Universidad del Valle",
+            "udistrital.edu.co": "Universidad Distrital Francisco José de Caldas",
+            "uis.edu.co": "Universidad Industrial de Santander",
+            "uninpahu.edu.co": "UNINPAHU",
+        },
+        validation_alias="DOMINIOS_INSTITUCIONALES",
+        description="Mapeo de dominios de correos institucionales a nombres de universidad",
+    )
+
+    # Configuración de Verificación con IA
+    IA_UMBRAL_LIBRO: float = Field(
+        default=0.10,
+        validation_alias="IA_UMBRAL_LIBRO",
+        description="Umbral de confianza mínima (0-1) para considerar una imagen como libro",
+    )
+
+    def es_dominio_institucional(self, email: str) -> bool:
+        """Determina si un correo electrónico pertenece a un dominio universitario institucional."""
+        if not email or "@" not in email:
+            return False
+        dominio = email.split("@")[-1].strip().lower()
+        dominios_permitidos = {d.strip().lower() for d in self.DOMINIOS_INSTITUCIONALES.keys()}
+        # Coincidencia exacta o subdominio institucional (ej. @alumno.unal.edu.co)
+        return any(dominio == d or dominio.endswith(f".{d}") for d in dominios_permitidos)
+
+    def obtener_universidad_por_dominio(self, email: str) -> str | None:
+        """Retorna el nombre oficial de la universidad asociada al dominio del correo."""
+        if not email or "@" not in email:
+            return None
+        dominio = email.split("@")[-1].strip().lower()
+        for d, u in self.DOMINIOS_INSTITUCIONALES.items():
+            d_lower = d.strip().lower()
+            if dominio == d_lower or dominio.endswith(f".{d_lower}"):
+                return u
+        return None
+
     # Configuración avanzada
     JWT_KEY: str = Field(default="MySuperSecretKey1234567890!@#$%^&*()_+", validation_alias="JWT_KEY")
     JWT_ISSUER: str = Field(default="PlataformaTrueque", validation_alias="JWT_ISSUER")
