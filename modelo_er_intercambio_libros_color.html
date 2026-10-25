@@ -1,0 +1,233 @@
+<style>
+#erd-wrap { background: #ffffff; border-radius: 12px; padding: 16px; overflow-x: auto; }
+#erd svg.erDiagram .row-rect-odd path,
+#erd svg.erDiagram .row-rect-odd rect,
+#erd svg.erDiagram .row-rect-even path,
+#erd svg.erDiagram .row-rect-even rect { stroke: none !important; }
+#erd svg.erDiagram text { fill: #2C2C2A !important; }
+</style>
+<h2 class="sr-only">Modelo entidad relación a color de una plataforma de intercambio de libros, agrupado por usuarios, publicaciones, intercambio y moderación, sobre fondo blanco</h2>
+<div id="erd-wrap"><div id="erd"></div></div>
+<script type="module">
+import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
+await document.fonts.ready;
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'base',
+  fontFamily: '"anthropic-sans", sans-serif',
+  themeVariables: {
+    darkMode: false,
+    fontSize: '13px',
+    fontFamily: '"anthropic-sans", sans-serif',
+    background: '#ffffff',
+    lineColor: '#5F5E5A',
+    textColor: '#2C2C2A',
+    primaryColor: '#E6F1FB',
+    primaryTextColor: '#042C53',
+    primaryBorderColor: '#378ADD',
+    attributeBackgroundColorOdd: '#ffffff',
+    attributeBackgroundColorEven: '#F5F7FA',
+  },
+});
+const src = `erDiagram
+  USUARIOS ||--o{ PUBLICACIONES : publica
+  USUARIOS ||--o{ VERIFICACIONES_OTP : genera
+  CATEGORIAS ||--o{ PUBLICACIONES : clasifica
+  PUBLICACIONES ||--o{ FOTOS_PUBLICACION : tiene
+  USUARIOS ||--o{ REPORTES : reporta
+  PUBLICACIONES ||--o{ REPORTES : es_reportada
+  PUBLICACIONES ||--o{ MATCHES : es_origen
+  PUBLICACIONES ||--o{ MATCHES : es_destino
+  USUARIOS ||--o{ ACCIONES_ADMINISTRATIVAS : ejecuta_admin
+  USUARIOS ||--o{ ACCIONES_ADMINISTRATIVAS : es_afectado
+  REPORTES ||--o{ ACCIONES_ADMINISTRATIVAS : origina
+  PUBLICACIONES ||--o{ ACCIONES_ADMINISTRATIVAS : involucra
+  MATCHES ||--o| TRUEQUES : concreta
+  USUARIOS ||--o{ TRUEQUES : propone
+  USUARIOS ||--o{ TRUEQUES : recibe
+  TRUEQUES ||--o{ CALIFICACIONES : habilita
+  USUARIOS ||--o{ CALIFICACIONES : califica
+  USUARIOS ||--o{ CALIFICACIONES : es_calificado
+  TRUEQUES ||--o| CHATS : abre
+  CHATS ||--o{ MENSAJES : contiene
+  USUARIOS ||--o{ MENSAJES : envia
+
+  USUARIOS {
+    serial id PK
+    varchar nombre
+    varchar apellido
+    varchar correo_institucional UK
+    varchar password_hash
+    enum tipo_usuario
+    varchar programa_area
+    enum rol
+    boolean verificado_comunidad
+    enum estado_cuenta
+    timestamp fecha_registro
+  }
+  CATEGORIAS {
+    serial id PK
+    varchar nombre
+  }
+  PUBLICACIONES {
+    serial id PK
+    int usuario_id FK
+    int categoria_id FK
+    varchar titulo
+    varchar autor
+    varchar isbn
+    varchar edicion
+    varchar estado_libro
+    text descripcion
+    varchar libro_buscado
+    enum estado_publicacion
+    timestamp fecha_publicacion
+  }
+  FOTOS_PUBLICACION {
+    serial id PK
+    int publicacion_id FK
+    varchar url_foto
+    int orden
+  }
+  VERIFICACIONES_OTP {
+    serial id PK
+    int usuario_id FK
+    varchar codigo
+    timestamp fecha_creacion
+    timestamp fecha_expiracion
+    boolean usado
+  }
+  REPORTES {
+    serial id PK
+    int usuario_reporta_id FK
+    int publicacion_id FK
+    text motivo
+    enum estado_reporte
+    timestamp fecha_reporte
+  }
+  MATCHES {
+    serial id PK
+    int publicacion_origen_id FK
+    int publicacion_destino_id FK
+    enum tipo_match
+    numeric puntuacion
+    timestamp fecha_creacion
+  }
+  ACCIONES_ADMINISTRATIVAS {
+    serial id PK
+    int admin_id FK
+    int reporte_id FK
+    int usuario_afectado_id FK
+    int publicacion_id FK
+    enum tipo_accion
+    text detalle
+    timestamp fecha_accion
+  }
+  TRUEQUES {
+    serial id PK
+    int match_id FK
+    int usuario_propone_id FK
+    int usuario_recibe_id FK
+    enum estado
+    timestamp fecha_propuesta
+    timestamp fecha_confirmacion
+    timestamp fecha_completado
+  }
+  CALIFICACIONES {
+    serial id PK
+    int trueque_id FK
+    int usuario_califica_id FK
+    int usuario_calificado_id FK
+    smallint estrellas
+    text resena
+    timestamp fecha_calificacion
+  }
+  CHATS {
+    serial id PK
+    int trueque_id FK
+    timestamp fecha_creacion
+  }
+  MENSAJES {
+    serial id PK
+    int chat_id FK
+    int usuario_id FK
+    text contenido
+    timestamp fecha_envio
+  }
+`;
+const { svg } = await mermaid.render('erd-svg', src);
+document.getElementById('erd').innerHTML = svg;
+document.getElementById('erd-svg').style.background = '#ffffff';
+
+const categoryColor = {
+  USUARIOS: ['#E6F1FB', '#378ADD', '#042C53'],
+  CATEGORIAS: ['#E6F1FB', '#378ADD', '#042C53'],
+  PUBLICACIONES: ['#E1F5EE', '#1D9E75', '#04342C'],
+  FOTOS_PUBLICACION: ['#E1F5EE', '#1D9E75', '#04342C'],
+  VERIFICACIONES_OTP: ['#E1F5EE', '#1D9E75', '#04342C'],
+  MATCHES: ['#EEEDFE', '#7F77DD', '#26215C'],
+  TRUEQUES: ['#EEEDFE', '#7F77DD', '#26215C'],
+  CHATS: ['#EEEDFE', '#7F77DD', '#26215C'],
+  MENSAJES: ['#EEEDFE', '#7F77DD', '#26215C'],
+  CALIFICACIONES: ['#EEEDFE', '#7F77DD', '#26215C'],
+  REPORTES: ['#FAECE7', '#D85A30', '#4A1B0C'],
+  ACCIONES_ADMINISTRATIVAS: ['#FAECE7', '#D85A30', '#4A1B0C'],
+};
+
+document.querySelectorAll('#erd svg.erDiagram .node').forEach(node => {
+  const idAttr = node.id || '';
+  const match = idAttr.match(/^entity-([A-Z_]+)-/);
+  const name = match ? match[1] : null;
+  const colors = name && categoryColor[name] ? categoryColor[name] : null;
+
+  const firstPath = node.querySelector('path[d]');
+  let outerRect = null;
+  if (firstPath) {
+    const d = firstPath.getAttribute('d');
+    const nums = d.match(/-?[\d.]+/g)?.map(Number);
+    if (nums && nums.length >= 8) {
+      const xs = [nums[0], nums[2], nums[4], nums[6]];
+      const ys = [nums[1], nums[3], nums[5], nums[7]];
+      const x = Math.min(...xs), y = Math.min(...ys);
+      const w = Math.max(...xs) - x, h = Math.max(...ys) - y;
+      outerRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      outerRect.setAttribute('x', x); outerRect.setAttribute('y', y);
+      outerRect.setAttribute('width', w); outerRect.setAttribute('height', h);
+      outerRect.setAttribute('rx', '8');
+      outerRect.setAttribute('fill', 'none');
+      outerRect.setAttribute('stroke', colors ? colors[1] : '#73726c');
+      outerRect.setAttribute('stroke-width', '1.5');
+      firstPath.replaceWith(outerRect);
+    }
+  }
+
+  if (colors) {
+    const titleText = Array.from(node.querySelectorAll('text')).find(t => t.textContent.trim() === name);
+    if (titleText) {
+      titleText.setAttribute('fill', colors[2]);
+      titleText.style.fontWeight = '500';
+      const tspans = titleText.querySelectorAll('tspan');
+      tspans.forEach(ts => ts.setAttribute('fill', colors[2]));
+      const bbox = titleText.getBBox();
+      const headerRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      headerRect.setAttribute('x', outerRect ? outerRect.getAttribute('x') : bbox.x - 10);
+      headerRect.setAttribute('y', bbox.y - 8);
+      headerRect.setAttribute('width', outerRect ? outerRect.getAttribute('width') : bbox.width + 20);
+      headerRect.setAttribute('height', bbox.height + 16);
+      headerRect.setAttribute('fill', colors[0]);
+      headerRect.setAttribute('rx', '0');
+      node.insertBefore(headerRect, titleText);
+    }
+  }
+});
+
+document.querySelectorAll('#erd svg.erDiagram .row-rect-odd path, #erd svg.erDiagram .row-rect-even path').forEach(p => {
+  p.setAttribute('stroke', 'none');
+});
+</script>
+<div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:10px;font-size:12px;color:#5F5E5A">
+  <span><span style="display:inline-block;width:10px;height:10px;background:#378ADD;border-radius:2px;margin-right:5px"></span>Usuarios / catálogo</span>
+  <span><span style="display:inline-block;width:10px;height:10px;background:#1D9E75;border-radius:2px;margin-right:5px"></span>Publicaciones</span>
+  <span><span style="display:inline-block;width:10px;height:10px;background:#7F77DD;border-radius:2px;margin-right:5px"></span>Intercambio</span>
+  <span><span style="display:inline-block;width:10px;height:10px;background:#D85A30;border-radius:2px;margin-right:5px"></span>Moderación</span>
+</div>
