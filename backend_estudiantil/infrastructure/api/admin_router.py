@@ -26,3 +26,159 @@ async def promote_user(
     # Promote using service method
     promoted_user = await service.promote_to_moderator(user_id)
     return {"msg": f"Usuario {user_id} promovido a {promoted_user.rol}"}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Módulo y Consola de Auditoría (Regla de las 5W)
+# ─────────────────────────────────────────────────────────────────────────────
+
+from typing import Optional, List
+from datetime import datetime
+from pydantic import BaseModel, ConfigDict
+from sqlalchemy import select, func, desc, or_
+from backend_estudiantil.adapters.db import AuditoriaLogORM, get_session_factory
+
+
+class AuditoriaItemRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    usuario_id: Optional[int] = None
+    usuario_email: Optional[str] = None
+    usuario_rol: Optional[str] = None
+    ip_origen: str
+    user_agent: Optional[str] = None
+    accion: str
+    recurso: Optional[str] = None
+    fecha_hora: datetime
+    metodo_http: str
+    endpoint: str
+    estado_http: int
+    exito: bool
+    detalle: Optional[str] = None
+    duracion_ms: Optional[float] = None
+
+
+class AuditoriaRespuesta(BaseModel):
+    total: int
+    skip: int
+    limit: int
+    items: List[AuditoriaItemRead]
+
+
+class AuditoriaStats(BaseModel):
+    total_eventos: int
+    eventos_exitosos: int
+    eventos_fallidos: int
+    intentos_bloqueados_401_403: int
+    usuarios_activos_auditados: int
+
+
+@router.get("/auditoria", response_model=AuditoriaRespuesta, summary="Consultar logs de auditoría 5W")
+async def consultar_auditoria(
+    skip: int = 0,
+    limit: int = 50,
+    accion: Optional[str] = None,
+    usuario_id: Optional[int] = None,
+    solo_errores: Optional[bool] = False,
+    recurso: Optional[str] = None,
+    busqueda: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Consulta la bitácora del sistema auditor aplicando la regla de las 5W.
+    Solo accesible para administradores.
+    """
+    if current_user.get("role") not in ("admin", "administrador"):
+        raise HTTPException(status_code=403, detail="Acceso restringido a administradores")
+
+    factory = get_session_factory()
+    async with factory() as session:
+        condiciones = []
+
+        if accion:
+            condiciones.append(AuditoriaLogORM.accion == accion)
+        if usuario_id is not None:
+            condiciones.append(AuditoriaLogORM.usuario_id == usuario_id)
+        if solo_errores:
+            condiciones.append(AuditoriaLogORM.exito == False)
+        if recurso:
+            condiciones.append(AuditoriaLogORM.recurso == recurso)
+        if busqueda:
+            termino = f"%{busqueda}%"
+            condiciones.append(
+                or_(
+                    AuditoriaLogORM.accion.ilike(termino),
+                    AuditoriaLogORM.endpoint.ilike(termino),
+                    AuditoriaLogORM.usuario_email.ilike(termino),
+                    AuditoriaLogORM.ip_origen.ilike(termino),
+                    AuditoriaLogORM.detalle.ilike(termino),
+                )
+            )
+
+        # Conteo total
+        stmt_count = select(func.count(AuditoriaLogORM.id))
+        if condiciones:
+            stmt_count = stmt_count.where(*condiciones)
+        total_res = await session.execute(stmt_count)
+        total = total_res.scalar_one()
+
+        # Consulta paginada
+        stmt = (
+            select(AuditoriaLogORM)
+            .where(*condiciones)
+            .order_by(desc(AuditoriaLogORM.fecha_hora))
+            .offset(skip)
+            .limit(limit)
+        )
+        result = await session.execute(stmt)
+        items = result.scalars().all()
+
+        return AuditoriaRespuesta(
+            total=total,
+            skip=skip,
+            limit=limit,
+            items=items,
+        )
+
+
+@router.get("/auditoria/stats", response_model=AuditoriaStats, summary="Estadísticas generales de auditoría")
+async def obtener_estadisticas_auditoria(
+    current_user: dict = Depends(get_current_user),
+):
+    """Retorna métricas clave del sistema auditor para el panel de administración."""
+    if current_user.get("role") not in ("admin", "administrador"):
+        raise HTTPException(status_code=403, detail="Acceso restringido a administradores")
+
+    factory = get_session_factory()
+    async with factory() as session:
+        # Total
+        total_stmt = select(func.count(AuditoriaLogORM.id))
+        total = (await session.execute(total_stmt)).scalar_one()
+
+        # Exitosos
+        exitosos_stmt = select(func.count(AuditoriaLogORM.id)).where(AuditoriaLogORM.exito == True)
+        exitosos = (await session.execute(exitosos_stmt)).scalar_one()
+
+        # Fallidos
+        fallidos_stmt = select(func.count(AuditoriaLogORM.id)).where(AuditoriaLogORM.exito == False)
+        fallidos = (await session.execute(fallidos_stmt)).scalar_one()
+
+        # 401 / 403
+        bloqueados_stmt = select(func.count(AuditoriaLogORM.id)).where(
+            AuditoriaLogORM.estado_http.in_([401, 403])
+        )
+        bloqueados = (await session.execute(bloqueados_stmt)).scalar_one()
+
+        # Usuarios únicos auditados
+        usuarios_stmt = select(func.count(func.distinct(AuditoriaLogORM.usuario_id))).where(
+            AuditoriaLogORM.usuario_id.isnot(None)
+        )
+        usuarios_activos = (await session.execute(usuarios_stmt)).scalar_one()
+
+        return AuditoriaStats(
+            total_eventos=total,
+            eventos_exitosos=exitosos,
+            eventos_fallidos=fallidos,
+            intentos_bloqueados_401_403=bloqueados,
+            usuarios_activos_auditados=usuarios_activos,
+        )

@@ -352,6 +352,93 @@ async def listar_mensajes(
         return mensajes
 
 
+from backend_estudiantil.domain.services.moderacion_contenido_service import ModeracionContenidoService
+from backend_estudiantil.infrastructure.moderacion_audit_helper import registrar_auditoria_infraccion
+
+_moderacion_service = ModeracionContenidoService()
+
+
+async def procesar_y_guardar_mensaje_chat(
+    session,
+    trueque_id: int,
+    user_id: int,
+    user_name: str,
+    contenido_crudo: str,
+    es_websocket: bool = False,
+    ip_origen: str = "127.0.0.1",
+    user_email: Optional[str] = None,
+    user_role: Optional[str] = None,
+) -> tuple[Optional[MensajeRead], Optional[str]]:
+    """Procesa, modera y persiste un mensaje de chat en UN solo punto central
+    reutilizado tanto por el endpoint HTTP REST como por el WebSocket.
+    """
+    contenido = contenido_crudo.strip()
+    if not contenido:
+        return None, "El mensaje no puede estar vacio"
+
+    trueque = await _get_trueque_or_404(session, trueque_id)
+    _assert_participant(trueque, user_id)
+
+    if trueque.estado in ("rechazado", "completado"):
+        return None, "No puedes enviar mensajes a un trueque rechazado o completado"
+
+    # Moderación de contenido y vocabulario
+    resultado = _moderacion_service.procesar_texto(contenido)
+
+    # Registro de auditoría (Regla de las 5W) para cualquier infracción detectada
+    if resultado.accion_auditoria:
+        await registrar_auditoria_infraccion(
+            usuario_id=user_id,
+            recurso=f"trueque:{trueque_id}:mensaje",
+            accion=resultado.accion_auditoria,
+            severidad=resultado.nivel_severidad or "leve",
+            categoria="vocabulario",
+            ip_origen=ip_origen,
+            metodo_http="WS" if es_websocket else "POST",
+            endpoint=f"/trueques/{trueque_id}/ws" if es_websocket else f"/trueques/{trueque_id}/mensajes",
+            estado_http=400 if not resultado.es_valido else 200,
+            usuario_email=user_email,
+            usuario_rol=user_role,
+            terminos_count=len(resultado.terminos_detectados),
+        )
+
+    if not resultado.es_valido:
+        return None, resultado.mensaje_error
+
+    nuevo_mensaje = MensajeORM(
+        trueque_id=trueque_id,
+        remitente_id=user_id,
+        contenido=resultado.texto_final,
+    )
+    session.add(nuevo_mensaje)
+    await session.commit()
+    await session.refresh(nuevo_mensaje)
+
+    response_msg = MensajeRead(
+        id=nuevo_mensaje.id,
+        trueque_id=nuevo_mensaje.trueque_id,
+        remitente_id=nuevo_mensaje.remitente_id,
+        remitente_nombre=user_name,
+        contenido=nuevo_mensaje.contenido,
+        fecha_envio=nuevo_mensaje.fecha_envio,
+    )
+
+    # Difundir en tiempo real via WebSocket / Redis
+    msg_dict = response_msg.model_dump()
+    msg_dict["fecha_envio"] = msg_dict["fecha_envio"].isoformat()
+    msg_dict["type"] = "message"
+    try:
+        await manager.broadcast(msg_dict, trueque_id)
+    except RedisError:
+        logger.exception(
+            "El mensaje %s se guardó, pero no se pudo distribuir por Redis",
+            response_msg.id,
+        )
+        response_msg.realtime_delivery = "unavailable"
+
+    return response_msg, None
+
+
 @router.post(
     "/{trueque_id}/mensajes",
     response_model=MensajeRead,
@@ -363,71 +450,31 @@ async def enviar_mensaje(
     payload: MensajeCreate,
     current_user: dict = Depends(get_current_user),
 ):
-    """Envia un nuevo mensaje al chat.
-
-    El chat esta disponible desde el momento de la propuesta (estado 'propuesto'),
-    permitiendo que las partes negocien los detalles antes de confirmar el trueque.
-    Solo se bloquea cuando el trueque es rechazado.
-    """
-    contenido = payload.contenido.strip()
-    if not contenido:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="El mensaje no puede estar vacio"
-        )
-
+    """Envia un nuevo mensaje al chat con moderación automática de vocabulario."""
     factory = get_session_factory()
     user_id = int(current_user["id"])
 
     async with factory() as session:
-        trueque = await _get_trueque_or_404(session, trueque_id)
-        _assert_participant(trueque, user_id)
-
-        if trueque.estado in ("rechazado", "completado"):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No puedes enviar mensajes a un trueque rechazado o completado",
-            )
-
-        nuevo_mensaje = MensajeORM(
-            trueque_id=trueque_id,
-            remitente_id=user_id,
-            contenido=contenido,
-        )
-        session.add(nuevo_mensaje)
-        await session.commit()
-        await session.refresh(nuevo_mensaje)
-
         nombre_completo = await _get_user_name(session, user_id)
-
-        response_msg = MensajeRead(
-            id=nuevo_mensaje.id,
-            trueque_id=nuevo_mensaje.trueque_id,
-            remitente_id=nuevo_mensaje.remitente_id,
-            remitente_nombre=nombre_completo,
-            contenido=nuevo_mensaje.contenido,
-            fecha_envio=nuevo_mensaje.fecha_envio,
+        msg, error = await procesar_y_guardar_mensaje_chat(
+            session=session,
+            trueque_id=trueque_id,
+            user_id=user_id,
+            user_name=nombre_completo,
+            contenido_crudo=payload.contenido,
+            es_websocket=False,
+            user_email=current_user.get("email"),
+            user_role=current_user.get("role"),
         )
-
-        # Difundir en tiempo real via WebSocket
-        msg_dict = response_msg.model_dump()
-        msg_dict["fecha_envio"] = msg_dict["fecha_envio"].isoformat()
-        msg_dict["type"] = "message"
-        try:
-            await manager.broadcast(msg_dict, trueque_id)
-        except RedisError:
-            logger.exception(
-                "El mensaje %s se guardó, pero no se pudo distribuir por Redis",
-                response_msg.id,
-            )
-            response_msg.realtime_delivery = "unavailable"
-
-        return response_msg
+        if error:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error)
+        return msg
 
 
 @router.websocket("/{trueque_id}/ws")
 async def websocket_endpoint(websocket: WebSocket, trueque_id: int):
     """Canal WebSocket bidireccional en tiempo real (P2P entre participantes).
-    Permite enviar mensajes, indicadores de escritura y presencia activa.
+    Permite enviar mensajes con moderación y auditoría de infracciones.
     """
     protocolos = websocket.scope.get("subprotocols", [])
     if len(protocolos) < 2 or protocolos[0] != "bearer":
@@ -443,6 +490,7 @@ async def websocket_endpoint(websocket: WebSocket, trueque_id: int):
 
     factory = get_session_factory()
     user_name = f"Usuario #{user_id}"
+    user_obj = None
     async with factory() as session:
         result = await session.execute(
             select(TruequeORM).where(TruequeORM.id == trueque_id)
@@ -452,14 +500,14 @@ async def websocket_endpoint(websocket: WebSocket, trueque_id: int):
             await websocket.close(code=4404)
             return
         result = await session.execute(select(UserORM).where(UserORM.id == user_id))
-        user = result.scalar_one_or_none()
-        if user is None or user.estado_cuenta != "activo":
+        user_obj = result.scalar_one_or_none()
+        if user_obj is None or user_obj.estado_cuenta != "activo":
             await websocket.close(code=4401)
             return
         if user_id not in (trueque.usuario_propone_id, trueque.usuario_recibe_id):
             await websocket.close(code=4403)
             return
-        user_name = f"{user.nombre or ''} {user.apellido or ''}".strip() or f"Usuario #{user_id}"
+        user_name = f"{user_obj.nombre or ''} {user_obj.apellido or ''}".strip() or f"Usuario #{user_id}"
 
     try:
         await manager.connect(websocket, trueque_id, user_id, user_name)
@@ -482,7 +530,6 @@ async def websocket_endpoint(websocket: WebSocket, trueque_id: int):
             msg_type = data.get("type", "message")
 
             if msg_type == "typing":
-                # Difundir estado de escritura al compañero de intercambio
                 is_typing = bool(data.get("is_typing", False))
                 await manager.broadcast(
                     {
@@ -501,35 +548,22 @@ async def websocket_endpoint(websocket: WebSocket, trueque_id: int):
                 if not contenido:
                     continue
 
+                client_host = websocket.client.host if websocket.client else "127.0.0.1"
                 async with factory() as session:
-                    q = await session.execute(select(TruequeORM).where(TruequeORM.id == trueque_id))
-                    t = q.scalar_one_or_none()
-                    if not t or t.estado in ("rechazado", "completado"):
-                        await websocket.send_json({
-                            "type": "error",
-                            "detail": "No puedes enviar mensajes a un trueque rechazado o completado",
-                        })
-                        continue
-
-                    nuevo_msg = MensajeORM(
+                    msg, error = await procesar_y_guardar_mensaje_chat(
+                        session=session,
                         trueque_id=trueque_id,
-                        remitente_id=user_id,
-                        contenido=contenido,
+                        user_id=user_id,
+                        user_name=user_name,
+                        contenido_crudo=contenido,
+                        es_websocket=True,
+                        ip_origen=client_host,
+                        user_email=getattr(user_obj, "correo_institucional", None),
+                        user_role=getattr(user_obj, "rol", "usuario"),
                     )
-                    session.add(nuevo_msg)
-                    await session.commit()
-                    await session.refresh(nuevo_msg)
-
-                    broadcast_data = {
-                        "type": "message",
-                        "id": nuevo_msg.id,
-                        "trueque_id": nuevo_msg.trueque_id,
-                        "remitente_id": nuevo_msg.remitente_id,
-                        "remitente_nombre": user_name,
-                        "contenido": nuevo_msg.contenido,
-                        "fecha_envio": nuevo_msg.fecha_envio.isoformat(),
-                    }
-                    await manager.broadcast(broadcast_data, trueque_id)
+                    if error:
+                        await websocket.send_json({"type": "error", "detail": error})
+                        continue
 
             elif msg_type == "ping":
                 await websocket.send_json({"type": "pong"})

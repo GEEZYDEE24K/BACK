@@ -54,12 +54,34 @@ class CalificacionService:
         if existente:
             raise ValueError("Ya has calificado este trueque anteriormente")
 
+        resena_limpia = resena
+        if resena and resena.strip():
+            from backend_estudiantil.domain.services.moderacion_contenido_service import ModeracionContenidoService
+            from backend_estudiantil.infrastructure.moderacion_audit_helper import registrar_auditoria_infraccion
+            mod = ModeracionContenidoService()
+            res = mod.procesar_texto(resena)
+            if res.accion_auditoria:
+                await registrar_auditoria_infraccion(
+                    usuario_id=usuario_califica_id,
+                    recurso=f"trueque:{trueque_id}:calificacion",
+                    accion=res.accion_auditoria,
+                    severidad=res.nivel_severidad or "leve",
+                    categoria="vocabulario",
+                    metodo_http="POST",
+                    endpoint=f"/calificaciones/trueques/{trueque_id}",
+                    estado_http=400 if not res.es_valido else 200,
+                    terminos_count=len(res.terminos_detectados),
+                )
+            if not res.es_valido:
+                raise ValueError(f"Reseña rechazada: {res.mensaje_error}")
+            resena_limpia = res.texto_final
+
         calificacion = Calificacion(
             trueque_id=trueque_id,
             usuario_califica_id=usuario_califica_id,
             usuario_calificado_id=usuario_calificado_id,
             estrellas=estrellas,
-            resena=resena,
+            resena=resena_limpia,
         )
         return await self.calificacion_repo.create(calificacion)
 
