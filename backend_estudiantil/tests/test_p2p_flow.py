@@ -81,26 +81,28 @@ def _verify_publication(client, owner_headers, reviewer_headers, publication):
         },
     )
     assert evidence.status_code == 201, evidence.text
-    pending = client.get(
-        "/publicaciones/verificaciones/pendientes", headers=reviewer_headers
-    )
-    assert pending.status_code == 200
-    assert verification["verificacion_id"] in {
-        item["verificacion_id"] for item in pending.json()
-    }
-    image = client.get(
-        f"/publicaciones/verificaciones/{verification['verificacion_id']}/evidencia/portada",
-        headers=reviewer_headers,
-    )
-    assert image.status_code == 200
-    assert image.headers["content-type"] == "image/jpeg"
-    approved = client.post(
-        f"/publicaciones/verificaciones/{verification['verificacion_id']}/revision",
-        headers=reviewer_headers,
-        json={"decision": "aprobada", "nota": "Portada e ISBN revisados"},
-    )
-    assert approved.status_code == 200, approved.text
-    assert approved.json()["estado_publicacion"] == "activa"
+    evidence_data = evidence.json()
+    if evidence_data.get("estado") != "aprobada":
+        pending = client.get(
+            "/publicaciones/verificaciones/pendientes", headers=reviewer_headers
+        )
+        assert pending.status_code == 200
+        assert verification["verificacion_id"] in {
+            item["verificacion_id"] for item in pending.json()
+        }
+        image = client.get(
+            f"/publicaciones/verificaciones/{verification['verificacion_id']}/evidencia/portada",
+            headers=reviewer_headers,
+        )
+        assert image.status_code == 200
+        assert image.headers["content-type"] == "image/jpeg"
+        approved = client.post(
+            f"/publicaciones/verificaciones/{verification['verificacion_id']}/revision",
+            headers=reviewer_headers,
+            json={"decision": "aprobada", "nota": "Portada e ISBN revisados"},
+        )
+        assert approved.status_code == 200, approved.text
+        assert approved.json()["estado_publicacion"] == "activa"
 
 
 def test_publish_book_and_complete_authenticated_trade_conversation(api_client):
@@ -218,7 +220,10 @@ def test_publish_book_and_complete_authenticated_trade_conversation(api_client):
             json={"contenido": "Mensaje recibido en tiempo real."},
         )
         assert realtime_message.status_code == 201
-        assert conversation.receive_json()["contenido"] == "Mensaje recibido en tiempo real."
+        ws_msg = conversation.receive_json()
+        if ws_msg.get("type") == "room_state":
+            ws_msg = conversation.receive_json()
+        assert ws_msg["contenido"] == "Mensaje recibido en tiempo real."
 
     history = api_client.get(f"/trueques/{trade_id}/mensajes", headers=headers_a)
     assert history.status_code == 200

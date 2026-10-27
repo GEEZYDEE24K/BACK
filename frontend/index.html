@@ -108,11 +108,11 @@
             <!-- Hero Banner -->
             <div class="hero-banner">
                 <div class="hero-content">
-                    <div class="hero-badge">
-                        <i class="fa-solid fa-book-open"></i> Comunidad de Lectores · SwapU
+                    <div class="hero-badge" style="background: rgba(234, 88, 12, 0.18); border: 1px solid rgba(234, 88, 12, 0.5); color: #ea580c; font-weight: 700;">
+                        <i class="fa-solid fa-graduation-cap"></i> Comunidad Bonaventuriana USBMED (@usbmed.edu.co) · Red de Trueque
                     </div>
                     <h2 class="hero-title">Intercambia libros y material con personas cerca de ti</h2>
-                    <p class="hero-subtitle">Conecta con otros lectores, consigue los libros que necesitas e intercambia los que ya no usas — sin gastar dinero. Para estudiantes, profesionales, aficionados y cualquier persona que ame los libros.</p>
+                    <p class="hero-subtitle">Plataforma colaborativa de trueque solidario de libros y apuntes con énfasis oficial en la <strong>Universidad de San Buenaventura Medellín (USBMED)</strong> y abierta a toda la comunidad universitaria y general. Sin dinero, matching inteligente y entregas seguras en campus.</p>
                     <div class="hero-actions">
                         <button class="btn btn-primary" onclick="app.openModal('publish-book-modal')">
                             <i class="fa-solid fa-plus"></i> Publicar un Libro
@@ -137,6 +137,7 @@
 
                 <div class="category-pills">
                     <button class="category-pill active" data-category="all">Todos los libros</button>
+                    <button class="category-pill usbmed-pill" data-category="usbmed" id="pill-usbmed"><i class="fa-solid fa-graduation-cap"></i> Solo USBMED</button>
                     <button class="category-pill" data-category="1">Ingeniería y Tecnología</button>
                     <button class="category-pill" data-category="2">Medicina y Salud</button>
                     <button class="category-pill" data-category="3">Ciencias Básicas</button>
@@ -275,10 +276,11 @@
 
                     <!-- Sugerencias de respuestas rápidas -->
                     <div class="chat-quick-replies" id="chat-quick-replies-area">
-                        <button class="quick-reply-chip">¿Dónde nos encontramos para la entrega?</button>
+                        <button class="quick-reply-chip">¿Nos vemos en Campus Salento (USBMED)?</button>
+                        <button class="quick-reply-chip">¿Nos vemos en Campus San Benito (Centro)?</button>
+                        <button class="quick-reply-chip">En la Biblioteca Central USBMED</button>
                         <button class="quick-reply-chip">¿A qué hora te queda bien hoy?</button>
                         <button class="quick-reply-chip">Ya estoy en el punto de encuentro.</button>
-                        <button class="quick-reply-chip">El libro está en excelente estado.</button>
                     </div>
 
                     <!-- Caja de Envío -->
@@ -368,6 +370,16 @@
                                     <i class="fa-solid fa-cloud-arrow-up"></i> Enviar Carné a Revisión
                                 </button>
                             </form>
+                            <!-- Validación por código de correo institucional -->
+                            <div style="margin-top: 1rem; padding-top: 0.85rem; border-top: 1px dashed rgba(99, 102, 241, 0.25);">
+                                <h5 style="margin: 0 0 0.25rem 0; font-size: 0.9rem; color: var(--text-primary);"><i class="fa-solid fa-envelope-circle-check" style="color: var(--primary); margin-right: 0.3rem;"></i>¿Tienes correo institucional?</h5>
+                                <p style="margin: 0 0 0.5rem 0; font-size: 0.8rem; color: var(--text-secondary);">Ingresa el código de 6 dígitos que enviamos a tu correo institucional al registrarte:</p>
+                                <form id="form-confirmar-codigo" onsubmit="event.preventDefault(); app.submitConfirmarCodigo();" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                    <input type="text" id="confirm-code-input" maxlength="6" placeholder="123456" class="form-control" style="max-width: 130px; font-size: 0.9rem; text-align: center; letter-spacing: 2px; font-weight: bold;" required>
+                                    <button type="submit" class="btn btn-outline btn-sm" id="btn-confirm-code">Validar Código</button>
+                                    <button type="button" class="btn btn-link btn-sm" onclick="app.reenviarCodigo()" style="font-size: 0.8rem; text-decoration: underline; background: none; border: none; color: var(--primary); cursor: pointer;">Reenviar código</button>
+                                </form>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -713,10 +725,13 @@
                     <hr style="flex: 1; border: none; border-top: 1px solid var(--border-light);">
                 </div>
 
-                <!-- Aviso de Comunidad Institucional -->
-                <div style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: var(--radius-md); padding: 0.75rem 0.9rem; margin-bottom: 1rem; font-size: 0.8rem; line-height: 1.4; color: var(--text-secondary);">
-                    <i class="fa-solid fa-graduation-cap" style="color: var(--primary); margin-right: 0.35rem;"></i>
-                    <strong>Comunidad y Estudiantes:</strong> Todos los usuarios (incluyendo cuentas de Gmail) pueden publicar y proponer trueques. Si además te registras con correo institucional o subes tu carné, obtendrás el distintivo de <em>Estudiante Verificado</em> para un matching académico más preciso.
+                <!-- Aviso de Comunidad Institucional USBMED -->
+                <div class="usbmed-callout-box">
+                    <div style="display: flex; align-items: center; gap: 0.45rem; margin-bottom: 0.25rem;">
+                        <span class="badge-usbmed"><i class="fa-solid fa-graduation-cap"></i> USBMED Oficial</span>
+                        <strong style="color: var(--text-primary); font-size: 0.88rem;">Comunidad Bonaventuriana</strong>
+                    </div>
+                    Si eres estudiante, docente o egresado de la <strong>Universidad de San Buenaventura Medellín (@usbmed.edu.co)</strong>, ingresa tu correo institucional. Te enviaremos un código de 6 dígitos para validar tu cuenta al instante, otorgarte la insignia de <em>Estudiante USBMED Verificado</em> y darte prioridad en matches dentro de los campus Salento y San Benito.
                 </div>
 
                 <!-- Formulario de Registro -->
@@ -726,8 +741,13 @@
                         <input type="text" id="reg-name" class="form-control" placeholder="Ej. Juan Pérez" required autocomplete="name">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Correo electrónico (*):</label>
-                        <input type="email" id="reg-email" class="form-control" placeholder="juan.perez@unal.edu.co" required autocomplete="email">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <label class="form-label">Correo electrónico (*):</label>
+                            <button type="button" onclick="app.quickFillUsbmedDomain()" style="font-size:0.73rem; padding: 0.15rem 0.5rem; color: var(--primary); border: 1px solid var(--primary); background: rgba(234,88,12,0.08); border-radius: var(--radius-sm); cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                                <i class="fa-solid fa-graduation-cap"></i> + @usbmed.edu.co
+                            </button>
+                        </div>
+                        <input type="email" id="reg-email" class="form-control" placeholder="juan.perez@usbmed.edu.co" required autocomplete="email" oninput="app.onRegisterEmailInput(this.value)">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Contraseña (*):</label>
@@ -757,7 +777,7 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">Universidad o Institución:</label>
-                        <input type="text" id="reg-univ" class="form-control" placeholder="Ej. Universidad Nacional de Colombia">
+                        <input type="text" id="reg-univ" class="form-control" placeholder="Ej. Universidad de San Buenaventura Medellín (USBMED)">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Teléfono / WhatsApp de contacto:</label>

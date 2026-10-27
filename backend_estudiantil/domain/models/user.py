@@ -24,6 +24,8 @@ class User:
         foto_url: Optional[str] = None,
         carnet_path: Optional[str] = None,
         perfil_completo: bool = False,
+        codigo_confirmacion: Optional[str] = None,
+        codigo_confirmacion_expira: Optional[datetime] = None,
         # Argumentos compatibles con llamadas anteriores
         email: Optional[str] = None,
         hashed_password: Optional[str] = None,
@@ -59,6 +61,8 @@ class User:
         self.foto_url = foto_url
         self.carnet_path = carnet_path
         self.perfil_completo = perfil_completo
+        self.codigo_confirmacion = codigo_confirmacion
+        self.codigo_confirmacion_expira = codigo_confirmacion_expira
 
     # Propiedades de compatibilidad
     @property

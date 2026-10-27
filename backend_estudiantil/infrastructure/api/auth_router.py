@@ -13,6 +13,8 @@ from backend_estudiantil.ports.security.authenticator import Authenticator
 from backend_estudiantil.schemas.auth import LoginRequest, Token
 from backend_estudiantil.schemas.user import UserCreate, UserRead
 
+from fastapi.responses import HTMLResponse
+
 class SocialAuthRequest(BaseModel):
     provider: str
     email: EmailStr
@@ -21,6 +23,13 @@ class SocialAuthRequest(BaseModel):
     telefono: Optional[str] = None
     carrera: Optional[str] = None
     universidad: Optional[str] = None
+
+class ConfirmarCodigoRequest(BaseModel):
+    email: EmailStr
+    codigo: str
+
+class ReenviarCodigoRequest(BaseModel):
+    email: EmailStr
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -179,3 +188,100 @@ async def social_login(
         role=role,
         expires_in=float(timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES).total_seconds()),
     )
+
+@router.post("/confirmar-codigo")
+async def confirmar_codigo(
+    payload: ConfirmarCodigoRequest,
+    service: UserService = Depends(get_user_service),
+):
+    """Confirma el código de 6 dígitos enviado al correo institucional para activar la verificación de comunidad."""
+    try:
+        user = await service.confirmar_codigo_verificacion(payload.email, payload.codigo)
+        return {
+            "message": "Correo institucional verificado exitosamente",
+            "verificado_comunidad": user.verificado_comunidad,
+            "universidad": user.universidad,
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+@router.get("/confirmar-correo", response_class=HTMLResponse)
+async def confirmar_correo(
+    email: str,
+    codigo: str,
+    service: UserService = Depends(get_user_service),
+):
+    """Enlace directo de confirmación para el correo institucional."""
+    try:
+        user = await service.confirmar_codigo_verificacion(email, codigo)
+        es_usbmed = "usbmed.edu.co" in (email or "").lower() or "buenaventura" in (user.universidad or "").lower()
+        titulo = "🎓 ¡Felicitaciones Bonaventuriano!" if es_usbmed else "✓ ¡Correo Verificado!"
+        desc_univ = "Universidad de San Buenaventura Medellín (USBMED)" if es_usbmed else (user.universidad or "tu universidad")
+        badge_text = "Estudiante USBMED Verificado" if es_usbmed else "Estudiante Verificado"
+        btn_color = "#ea580c" if es_usbmed else "#4f46e5"
+
+        return f"""
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Correo Verificado - SwapU</title>
+            <style>
+                body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #0c0a09; color: #fafaf9; }}
+                .card {{ background: #1c1917; padding: 2.5rem; border-radius: 14px; border: 1px solid #44403c; text-align: center; max-width: 480px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5); }}
+                h1 {{ color: {btn_color}; margin-top: 0; font-size: 1.6rem; }}
+                p {{ color: #a8a29e; line-height: 1.6; font-size: 0.95rem; }}
+                .badge {{ display: inline-block; background: rgba(234, 88, 12, 0.2); color: #fb923c; border: 1px solid rgba(251, 146, 60, 0.4); padding: 0.35rem 0.85rem; border-radius: 999px; font-weight: 700; font-size: 0.85rem; margin: 0.5rem 0 1rem 0; }}
+                .btn {{ display: inline-block; margin-top: 1.5rem; padding: 0.85rem 1.8rem; background: {btn_color}; color: white; text-decoration: none; border-radius: 8px; font-weight: 700; }}
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <h1>{titulo}</h1>
+                <div class="badge">🏷 {badge_text}</div>
+                <p>Tu correo institucional <strong>{email}</strong> ha sido confirmado con éxito. Tu cuenta ahora cuenta con el distintivo oficial de <strong>{badge_text}</strong> en {desc_univ}.</p>
+                <p style="font-size: 0.85rem; color: #78716c;">Tienes acceso preferencial a matches académicos y entregas comunitarias en campus.</p>
+                <a href="/" class="btn">Ingresar a SwapU</a>
+            </div>
+        </body>
+        </html>
+        """
+    except ValueError as e:
+        return f"""
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Error de Verificación - SwapU</title>
+            <style>
+                body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f8fafc; }}
+                .card {{ background: white; padding: 2.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); text-align: center; max-width: 450px; }}
+                h1 {{ color: #dc2626; margin-top: 0; }}
+                p {{ color: #475569; line-height: 1.5; }}
+                .btn {{ display: inline-block; margin-top: 1.5rem; padding: 0.75rem 1.5rem; background: #4f46e5; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; }}
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <h1>⚠ No se pudo verificar</h1>
+                <p>{str(e)}</p>
+                <a href="/" class="btn">Volver a SwapU</a>
+            </div>
+        </body>
+        </html>
+        """
+
+@router.post("/reenviar-codigo")
+async def reenviar_codigo(
+    payload: ReenviarCodigoRequest,
+    service: UserService = Depends(get_user_service),
+):
+    """Reenvía un nuevo código de confirmación al correo institucional."""
+    try:
+        await service.reenviar_codigo_verificacion(payload.email)
+        return {"message": "Código de confirmación reenviado exitosamente"}
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+

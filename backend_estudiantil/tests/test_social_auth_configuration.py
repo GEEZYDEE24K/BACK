@@ -4,8 +4,8 @@ from fastapi import HTTPException
 from backend_estudiantil.adapters.security.google_oauth2_authenticator import (
     GoogleOAuth2Authenticator,
 )
-from backend_estudiantil.adapters.security.twitter_oauth2_authenticator import (
-    TwitterOAuth2Authenticator,
+from backend_estudiantil.adapters.security.facebook_oauth2_authenticator import (
+    FacebookOAuth2Authenticator,
 )
 from backend_estudiantil.config.settings import settings
 
@@ -21,10 +21,10 @@ from backend_estudiantil.config.settings import settings
             "Google",
         ),
         (
-            TwitterOAuth2Authenticator(),
-            "TWITTER_CLIENT_ID",
-            "TWITTER_CLIENT_SECRET",
-            "X",
+            FacebookOAuth2Authenticator(),
+            "FACEBOOK_CLIENT_ID",
+            "FACEBOOK_CLIENT_SECRET",
+            "Facebook",
         ),
     ],
 )

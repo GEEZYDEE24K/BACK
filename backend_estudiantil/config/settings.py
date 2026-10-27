@@ -62,6 +62,8 @@ class Settings(BaseSettings):
     # Verificación de comunidad y dominios institucionales
     DOMINIOS_INSTITUCIONALES: dict[str, str] = Field(
         default={
+            "usbmed.edu.co": "Universidad de San Buenaventura Medellín",
+            "sanbuenaventura.edu.co": "Universidad de San Buenaventura",
             "unal.edu.co": "Universidad Nacional de Colombia",
             "udea.edu.co": "Universidad de Antioquia",
             "uniandes.edu.co": "Universidad de los Andes",
@@ -81,6 +83,14 @@ class Settings(BaseSettings):
         validation_alias="IA_UMBRAL_LIBRO",
         description="Umbral de confianza mínima (0-1) para considerar una imagen como libro",
     )
+
+    # Configuración de Servidor de Correo SMTP para confirmación
+    SMTP_HOST: str = Field(default="", validation_alias="SMTP_HOST")
+    SMTP_PORT: int = Field(default=587, validation_alias="SMTP_PORT")
+    SMTP_USER: str = Field(default="", validation_alias="SMTP_USER")
+    SMTP_PASSWORD: str = Field(default="", validation_alias="SMTP_PASSWORD")
+    SMTP_FROM_EMAIL: str = Field(default="", validation_alias="SMTP_FROM_EMAIL")
+    APP_BASE_URL: str = Field(default="http://localhost:8000", validation_alias="APP_BASE_URL")
 
     def es_dominio_institucional(self, email: str) -> bool:
         """Determina si un correo electrónico pertenece a un dominio universitario institucional."""

@@ -48,11 +48,23 @@ async def google_callback(
     if not email:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Google account has no email")
 
+    # Exigir estrictamente email_verified=true en Google OAuth
+    email_verified = userinfo.get("email_verified")
+    if email_verified is None:
+        email_verified = userinfo.get("verified_email")
+
+    if not email_verified:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La cuenta de Google debe tener el correo verificado (email_verified=true)",
+        )
+
+    es_inst = settings.es_dominio_institucional(email) and bool(email_verified)
+    uni = settings.obtener_universidad_por_dominio(email) if es_inst else None
+
     # Si no existe, crear al usuario automáticamente
     user = await repo.get_by_email(email)
     if not user:
-        es_inst = settings.es_dominio_institucional(email)
-        uni = settings.obtener_universidad_por_dominio(email)
         user = User(
             correo_institucional=email,
             password_hash="",  # Sin contraseña para usuarios federados con Google
@@ -62,8 +74,24 @@ async def google_callback(
             verificado_comunidad=es_inst,
             universidad=uni,
             perfil_completo=bool(name and uni),
+            foto_url=userinfo.get("picture"),
         )
-        await repo.create(user)
+        user = await repo.create(user)
+    else:
+        # Si ya existía, pero es institucional y Google certifica que el correo está verificado
+        modificado = False
+        if es_inst and not user.verificado_comunidad:
+            user.verificado_comunidad = True
+            if not user.universidad:
+                user.universidad = uni
+            user.codigo_confirmacion = None
+            user.codigo_confirmacion_expira = None
+            modificado = True
+        if userinfo.get("picture") and not user.foto_url:
+            user.foto_url = userinfo.get("picture")
+            modificado = True
+        if modificado:
+            user = await repo.update(user)
 
     # Emitir tokens JWT
     role = user.rol

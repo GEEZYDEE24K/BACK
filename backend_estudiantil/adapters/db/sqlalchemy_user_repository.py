@@ -34,6 +34,8 @@ class SQLAlchemyUserRepository(UserRepository):
             foto_url=getattr(orm, "foto_url", None),
             carnet_path=getattr(orm, "carnet_path", None),
             perfil_completo=getattr(orm, "perfil_completo", False),
+            codigo_confirmacion=getattr(orm, "codigo_confirmacion", None),
+            codigo_confirmacion_expira=getattr(orm, "codigo_confirmacion_expira", None),
         )
 
     async def get_by_id(self, user_id) -> Optional[User]:
@@ -70,6 +72,8 @@ class SQLAlchemyUserRepository(UserRepository):
                 foto_url=user.foto_url,
                 carnet_path=user.carnet_path,
                 perfil_completo=user.perfil_completo,
+                codigo_confirmacion=user.codigo_confirmacion,
+                codigo_confirmacion_expira=user.codigo_confirmacion_expira,
             )
             session.add(orm)
             await session.commit()
@@ -97,6 +101,8 @@ class SQLAlchemyUserRepository(UserRepository):
             orm.foto_url = user.foto_url
             orm.carnet_path = user.carnet_path
             orm.perfil_completo = user.perfil_completo
+            orm.codigo_confirmacion = user.codigo_confirmacion
+            orm.codigo_confirmacion_expira = user.codigo_confirmacion_expira
             await session.commit()
             await session.refresh(orm)
             return await self._to_entity(orm)
@@ -115,6 +121,7 @@ class SQLAlchemyUserRepository(UserRepository):
 
     async def list(self, skip: int = 0, limit: int = 100) -> List[User]:
         async with self.session_factory() as session:
-            result = await session.execute(select(UserORM).offset(skip).limit(limit))
+            result = await session.execute(select(UserORM).order_by(UserORM.id.desc()).offset(skip).limit(limit))
             orms = result.scalars().all()
             return [await self._to_entity(o) for o in orms]
+

@@ -138,9 +138,9 @@ app.include_router(verificaciones_router)
 try:
     import prometheus_fastapi_instrumentator.routing as pfi_routing
     _orig_get_route_name = pfi_routing._get_route_name
-    def _safe_get_route_name(scope, routes, route_name=None):
+    def _safe_get_route_name(scope, routes, *args, **kwargs):
         safe_routes = [r for r in routes if hasattr(r, "path")]
-        return _orig_get_route_name(scope, safe_routes, route_name)
+        return _orig_get_route_name(scope, safe_routes)
     pfi_routing._get_route_name = _safe_get_route_name
 except Exception:
     pass

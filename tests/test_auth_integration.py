@@ -84,7 +84,7 @@ async def test_google_oauth_flow():
     token_url = "https://oauth2.googleapis.com/token"
     respx.post(token_url).mock(return_value=httpx.Response(200, json={"access_token": "mock_access_token"}))
     userinfo_url = "https://www.googleapis.com/oauth2/v2/userinfo"
-    respx.get(userinfo_url).mock(return_value=httpx.Response(200, json={"email": "googleuser@example.com", "name": "Google User"}))
+    respx.get(userinfo_url).mock(return_value=httpx.Response(200, json={"email": "googleuser@example.com", "name": "Google User", "email_verified": True}))
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as async_client:

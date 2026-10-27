@@ -81,6 +81,8 @@ class UserORM(Base):
     foto_url = sa.Column(sa.String(512), nullable=True)
     carnet_path = sa.Column(sa.String(512), nullable=True)
     perfil_completo = sa.Column(sa.Boolean, default=False, nullable=False)
+    codigo_confirmacion = sa.Column(sa.String(64), nullable=True)
+    codigo_confirmacion_expira = sa.Column(sa.DateTime, nullable=True)
 
     # Relaciones
     publicaciones = relationship("PublicacionORM", back_populates="usuario", cascade="all, delete-orphan", foreign_keys="PublicacionORM.usuario_id")

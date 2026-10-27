@@ -87,7 +87,7 @@ class CampusSwapApp {
                 document.querySelectorAll(".category-pill").forEach(p => p.classList.remove("active"));
                 pill.classList.add("active");
                 const catId = pill.getAttribute("data-category");
-                this.activeCategory = catId === "all" ? null : parseInt(catId);
+                this.activeCategory = catId === "all" ? null : (catId === "usbmed" ? "usbmed" : parseInt(catId));
                 this.filterAndRenderBooks();
             });
         });
@@ -208,7 +208,14 @@ class CampusSwapApp {
         if (!grid) return;
 
         let filtered = [...this.books];
-        if (this.activeCategory) {
+        if (this.activeCategory === "usbmed") {
+            filtered = filtered.filter(b => {
+                const u = (b.usuario_universidad || "").toLowerCase();
+                const d = (b.descripcion || "").toLowerCase();
+                const lb = (b.libro_buscado || "").toLowerCase();
+                return u.includes("usbmed") || u.includes("san buenaventura") || d.includes("usbmed") || lb.includes("usbmed");
+            });
+        } else if (this.activeCategory) {
             filtered = filtered.filter(b => b.categoria_id === this.activeCategory);
         }
         if (this.searchQuery.trim()) {
@@ -242,6 +249,14 @@ class CampusSwapApp {
                 ? book.portada_fallback
                 : (api.getThematicCover ? api.getThematicCover(book.titulo, book.categoria_id) : 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80');
 
+            const isBookUsbmed = (book.usuario_universidad && (
+                book.usuario_universidad.toLowerCase().includes("usbmed") ||
+                book.usuario_universidad.toLowerCase().includes("san buenaventura")
+            ));
+            const usbmedBadge = isBookUsbmed 
+                ? `<span class="badge-usbmed" title="Comunidad Bonaventuriana"><i class="fa-solid fa-graduation-cap"></i> USBMED</span>` 
+                : '';
+
             return `
             <div class="book-card">
                 <div class="book-card-header">
@@ -264,8 +279,9 @@ class CampusSwapApp {
                         <div class="owner-info">
                             <img src="${this.escapeHtml(book.usuario_avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80')}" class="owner-avatar" alt="${this.escapeHtml(book.usuario_nombre)}">
                             <div class="owner-details">
-                                <span class="owner-name">
+                                <span class="owner-name" style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
                                     ${this.escapeHtml(book.usuario_nombre)}
+                                    ${usbmedBadge}
                                     <i class="fa-solid fa-circle-check verified-badge" title="Usuario Verificado"></i>
                                 </span>
                                 <span class="owner-univ">${book.usuario_carrera ? `${this.escapeHtml(book.usuario_carrera)} • ` : ''}${this.escapeHtml(book.usuario_universidad || 'Comunidad')}</span>
@@ -1563,19 +1579,34 @@ class CampusSwapApp {
 
         // Badge de verificación de comunidad / estudiante
         const verificado = user.verificado_comunidad || user.verificado;
+        const isUsbmed = (user.email && user.email.toLowerCase().includes("usbmed.edu.co")) || 
+                         (user.universidad && (user.universidad.toLowerCase().includes("usbmed") || user.universidad.toLowerCase().includes("san buenaventura")));
         if (badgeComunidad) {
             if (verificado) {
-                badgeComunidad.innerHTML = '<i class="fa-solid fa-graduation-cap" style="margin-right:0.3rem;"></i>Estudiante Verificado';
-                badgeComunidad.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
-                badgeComunidad.style.color = '#fff';
+                if (isUsbmed) {
+                    badgeComunidad.innerHTML = '<i class="fa-solid fa-graduation-cap" style="margin-right:0.3rem;"></i>Estudiante USBMED Verificado';
+                    badgeComunidad.style.background = 'linear-gradient(135deg, #ea580c, #c2410c)';
+                    badgeComunidad.style.color = '#fff';
+                } else {
+                    badgeComunidad.innerHTML = '<i class="fa-solid fa-graduation-cap" style="margin-right:0.3rem;"></i>Estudiante Verificado';
+                    badgeComunidad.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
+                    badgeComunidad.style.color = '#fff';
+                }
             } else {
                 badgeComunidad.innerHTML = '<i class="fa-solid fa-user-check" style="margin-right:0.3rem;"></i>Comunidad General';
                 badgeComunidad.style.background = 'linear-gradient(135deg, #64748b, #475569)';
                 badgeComunidad.style.color = '#fff';
             }
         }
-        if (statComunidad) statComunidad.textContent = verificado ? "Estudiante ✓" : "General";
-        if (statComunidad) statComunidad.style.color = verificado ? "var(--success)" : "var(--primary)";
+        if (statComunidad) {
+            if (verificado) {
+                statComunidad.textContent = isUsbmed ? "USBMED ✓" : "Estudiante ✓";
+                statComunidad.style.color = isUsbmed ? "#ea580c" : "var(--success)";
+            } else {
+                statComunidad.textContent = isUsbmed ? "Pendiente USBMED" : "General";
+                statComunidad.style.color = "var(--primary)";
+            }
+        }
 
         // Badge de completitud de perfil
         const completo = user.perfil_completo || (user.carrera && user.universidad && user.telefono);
@@ -1698,6 +1729,74 @@ class CampusSwapApp {
             if (statusEl) statusEl.innerHTML = `<span style="color:var(--danger);">${e.message || 'Error al subir el archivo'}</span>`;
         } finally {
             if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Enviar Carné a Revisión'; }
+        }
+    }
+
+    async submitConfirmarCodigo() {
+        const user = api.getCurrentUser();
+        if (!user || !user.email) {
+            this.showToast("Inicia sesión para confirmar tu código", "warning");
+            return;
+        }
+        const codeInput = document.getElementById("confirm-code-input");
+        const btn = document.getElementById("btn-confirm-code");
+        const codigo = codeInput?.value?.trim();
+        if (!codigo || codigo.length < 6) {
+            this.showToast("Ingresa el código de 6 dígitos", "warning");
+            return;
+        }
+        if (btn) { btn.disabled = true; btn.textContent = "Validando..."; }
+        try {
+            const res = await api.confirmarCodigo(user.email, codigo);
+            this.showToast(res.message || "¡Correo institucional verificado!", "success");
+            if (codeInput) codeInput.value = "";
+            await this.renderProfile();
+        } catch (e) {
+            this.showToast(e.message || "Código incorrecto o expirado", "error");
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = "Validar Código"; }
+        }
+    }
+
+    async reenviarCodigo() {
+        const user = api.getCurrentUser();
+        if (!user || !user.email) {
+            this.showToast("Inicia sesión primero", "warning");
+            return;
+        }
+        try {
+            const res = await api.reenviarCodigo(user.email);
+            this.showToast(res.message || "Nuevo código enviado a tu correo institucional", "info");
+        } catch (e) {
+            this.showToast(e.message || "Error al reenviar código", "error");
+        }
+    }
+
+    quickFillUsbmedDomain() {
+        const emailInput = document.getElementById("reg-email");
+        if (!emailInput) return;
+        let val = emailInput.value.trim();
+        if (!val) {
+            emailInput.value = "@usbmed.edu.co";
+            emailInput.focus();
+            emailInput.setSelectionRange(0, 0);
+        } else if (val.includes("@")) {
+            const prefix = val.split("@")[0];
+            emailInput.value = `${prefix}@usbmed.edu.co`;
+        } else {
+            emailInput.value = `${val}@usbmed.edu.co`;
+        }
+        this.onRegisterEmailInput(emailInput.value);
+    }
+
+    onRegisterEmailInput(email) {
+        if (!email) return;
+        const univInput = document.getElementById("reg-univ");
+        const lower = email.trim().toLowerCase();
+        if (lower.includes("@usbmed.edu.co") || lower.includes("@sanbuenaventura.edu.co") || lower.endsWith("usbmed.edu.co")) {
+            if (univInput) {
+                univInput.value = "Universidad de San Buenaventura Medellín";
+            }
         }
     }
 

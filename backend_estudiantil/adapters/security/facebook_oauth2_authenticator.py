@@ -5,6 +5,14 @@ from backend_estudiantil.config.settings import settings
 
 class FacebookOAuth2Authenticator:
     async def get_authorization_url(self) -> str:
+        if not settings.FACEBOOK_CLIENT_ID.strip() or not settings.FACEBOOK_CLIENT_SECRET.strip():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=(
+                    "Inicio con Facebook no configurado. Define FACEBOOK_CLIENT_ID y "
+                    "FACEBOOK_CLIENT_SECRET en el entorno del backend."
+                ),
+            )
         params = {
             "client_id": settings.FACEBOOK_CLIENT_ID,
             "redirect_uri": settings.FACEBOOK_REDIRECT_URI,

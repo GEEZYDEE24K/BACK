@@ -157,6 +157,20 @@ class ApiService {
         }
     }
 
+    async confirmarCodigo(email, codigo) {
+        return this._fetch("/auth/confirmar-codigo", {
+            method: "POST",
+            body: JSON.stringify({ email, codigo }),
+        });
+    }
+
+    async reenviarCodigo(email) {
+        return this._fetch("/auth/reenviar-codigo", {
+            method: "POST",
+            body: JSON.stringify({ email }),
+        });
+    }
+
     async socialLogin(provider = "google") {
         const width = 500;
         const height = 660;

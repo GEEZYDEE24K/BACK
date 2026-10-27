@@ -14,24 +14,58 @@ def jwt_auth():
 
 
 @pytest.mark.asyncio
-async def test_verificacion_comunidad_por_dominio_institucional(jwt_auth):
-    """Verifica que un correo de dominio institucional active verificado_comunidad=True automáticamente."""
+async def test_registro_password_no_marca_verificado_hasta_confirmar_codigo(jwt_auth):
+    """Verifica que el registro con contraseña NO active verificado_comunidad de inmediato y requiera confirmación de código."""
     transport = ASGITransport(app=app)
     uid = uuid.uuid4().hex[:6]
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        # 1. Usuario con dominio institucional (@unal.edu.co)
+        email_inst = f"estudiante_{uid}@usbmed.edu.co"
+        # 1. Registro con dominio institucional de USBMED
         res_inst = await ac.post("/auth/register", json={
-            "email": f"estudiante_{uid}@unal.edu.co",
+            "email": email_inst,
             "password": "Password123*",
             "name": "Carlos Rodríguez",
             "carrera": "Ingeniería de Sistemas",
         })
         assert res_inst.status_code == 201
         data_inst = res_inst.json()
-        assert data_inst["verificado_comunidad"] is True
-        assert "Universidad Nacional" in (data_inst.get("universidad") or "")
+        # REGLA: NO debe estar verificado sólo por el dominio
+        assert data_inst["verificado_comunidad"] is False
 
-        # 2. Usuario con correo externo (@gmail.com)
+        # Obtener el código de confirmación generado en la BD
+        factory = get_session_factory()
+        async with factory() as session:
+            q = await session.execute(select(UserORM).where(UserORM.correo_institucional == email_inst))
+            u = q.scalar_one()
+            codigo_guardado = u.codigo_confirmacion
+            assert codigo_guardado is not None
+            assert len(codigo_guardado) == 6
+
+        # 2. Intentar confirmar con código erróneo -> 400 Bad Request
+        res_fail = await ac.post("/auth/confirmar-codigo", json={
+            "email": email_inst,
+            "codigo": "000000",
+        })
+        assert res_fail.status_code == 400
+        assert "incorrecto" in res_fail.json()["detail"].lower()
+
+        # 3. Confirmar con código correcto -> 200 OK y verificado_comunidad=True
+        res_ok = await ac.post("/auth/confirmar-codigo", json={
+            "email": email_inst,
+            "codigo": codigo_guardado,
+        })
+        assert res_ok.status_code == 200
+        assert res_ok.json()["verificado_comunidad"] is True
+
+        # Verificar en la base de datos que ya no hay código pendiente y la comunidad está verificada
+        async with factory() as session:
+            q = await session.execute(select(UserORM).where(UserORM.correo_institucional == email_inst))
+            u = q.scalar_one()
+            assert u.verificado_comunidad is True
+            assert u.codigo_confirmacion is None
+            assert u.universidad == "Universidad de San Buenaventura Medellín"
+
+        # 4. Usuario con correo externo (@gmail.com) no tiene verificado_comunidad
         res_ext = await ac.post("/auth/register", json={
             "email": f"usuario_ext_{uid}@gmail.com",
             "password": "Password123*",
@@ -40,6 +74,7 @@ async def test_verificacion_comunidad_por_dominio_institucional(jwt_auth):
         assert res_ext.status_code == 201
         data_ext = res_ext.json()
         assert data_ext["verificado_comunidad"] is False
+
 
 
 @pytest.mark.asyncio
@@ -154,3 +189,55 @@ async def test_flujo_solicitud_y_aprobacion_carne_estudiantil(jwt_auth):
         aprobar_res = await ac.post(f"/usuarios/{alumno_id}/verificar", headers=mod_headers)
         assert aprobar_res.status_code == 200
         assert aprobar_res.json()["verificado_comunidad"] is True
+
+
+@pytest.mark.asyncio
+async def test_google_oauth_exige_email_verified():
+    """Verifica que Google OAuth exija email_verified=true y active verificado_comunidad si es institucional."""
+    from backend_estudiantil.infrastructure.api.google_oauth_router import get_google_authenticator
+
+    class MockGoogleAuth:
+        def __init__(self, email_verified: bool, email: str):
+            self.email_verified = email_verified
+            self.email = email
+
+        async def exchange_code(self, code: str):
+            return {"access_token": "mock_google_token"}
+
+        async def get_userinfo(self, token: str):
+            return {
+                "id": "123456789",
+                "email": self.email,
+                "name": "Estudiante Google",
+                "email_verified": self.email_verified,
+            }
+
+    transport = ASGITransport(app=app)
+    uid = uuid.uuid4().hex[:6]
+
+    # 1. Caso email_verified=False -> 400 Bad Request
+    app.dependency_overrides[get_google_authenticator] = lambda: MockGoogleAuth(
+        email_verified=False,
+        email=f"google_unverified_{uid}@unal.edu.co"
+    )
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        res = await ac.get("/auth/google/callback?code=mock_code")
+        assert res.status_code == 400
+        assert "email_verified=true" in res.json()["detail"]
+
+    # 2. Caso email_verified=True con correo institucional -> 200 y verificado_comunidad=True
+    email_inst = f"google_verified_{uid}@usbmed.edu.co"
+    app.dependency_overrides[get_google_authenticator] = lambda: MockGoogleAuth(
+        email_verified=True,
+        email=email_inst
+    )
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        res = await ac.get("/auth/google/callback?code=mock_code", headers={"Accept": "application/json"})
+        assert res.status_code == 200
+        data = res.json()
+        assert data["user"]["verificado_comunidad"] is True
+        assert data["user"]["universidad"] == "Universidad de San Buenaventura Medellín"
+
+    # Limpiar overrides
+    app.dependency_overrides.pop(get_google_authenticator, None)
+
